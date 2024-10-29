@@ -32,6 +32,13 @@ versionRange = "${neoforge_version_range}"
 side = "CLIENT"
 
 [[dependencies.${mod_id}]]
+modId = "sodium"
+mandatory = false
+versionRange = "[0.6.0-beta.2,)"
+side = "CLIENT"
+
+# Simulates a breaks/incompatible dependency
+[[dependencies.${mod_id}]]
 modId = "embeddium"
 type = "incompatible"
 reason = "Remove Embeddium and install Sodium"

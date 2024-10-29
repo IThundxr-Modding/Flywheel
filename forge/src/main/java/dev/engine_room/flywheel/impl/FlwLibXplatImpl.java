@@ -2,7 +2,6 @@ package dev.engine_room.flywheel.impl;
 
 import java.lang.reflect.Field;
 
-import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnknownNullability;
 
 import dev.engine_room.flywheel.impl.compat.CompatMods;
