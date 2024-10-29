@@ -9,6 +9,6 @@ public enum CompatMods {
 	public final boolean isLoaded;
 
 	CompatMods(String modId) {
-		isLoaded = FlwImplXplat.INSTANCE.getModLoaded(modId);
+		isLoaded = FlwImplXplat.INSTANCE.isModLoaded(modId);
 	}
 }

@@ -5,7 +5,6 @@ import dev.engine_room.flywheel.impl.compat.CompatMod;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.neoforged.fml.loading.LoadingModList;
 import net.neoforged.neoforge.common.NeoForge;
-import net.minecraftforge.fml.loading.LoadingModList;
 
 public class FlwImplXplatImpl implements FlwImplXplat {
 	@Override
