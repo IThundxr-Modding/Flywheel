@@ -14,6 +14,7 @@ public class ObjectStorage extends AbstractArena {
 	public static final int PAGE_MASK = PAGE_SIZE - 1;
 
 	public static final int INITIAL_PAGES_ALLOCATED = 4;
+	public static final int DESCRIPTOR_SIZE_BYTES = Integer.BYTES * 2;
 
 	/**
 	 * The GPU side buffer containing all the objects, logically divided into page frames.
@@ -37,8 +38,8 @@ public class ObjectStorage extends AbstractArena {
 		this.frameDescriptorBuffer = new ResizableStorageBuffer();
 
 		objectBuffer.ensureCapacity(INITIAL_PAGES_ALLOCATED * elementSizeBytes);
-		frameDescriptorBuffer.ensureCapacity(INITIAL_PAGES_ALLOCATED * Integer.BYTES);
-		frameDescriptors = MemoryBlock.malloc(INITIAL_PAGES_ALLOCATED * Integer.BYTES);
+		frameDescriptorBuffer.ensureCapacity(INITIAL_PAGES_ALLOCATED * DESCRIPTOR_SIZE_BYTES);
+		frameDescriptors = MemoryBlock.malloc(INITIAL_PAGES_ALLOCATED * DESCRIPTOR_SIZE_BYTES);
 	}
 
 	public Mapping createMapping() {
@@ -79,7 +80,7 @@ public class ObjectStorage extends AbstractArena {
 	}
 
 	private long ptrForPage(int page) {
-		return frameDescriptors.ptr() + (long) page * Integer.BYTES;
+		return frameDescriptors.ptr() + (long) page * DESCRIPTOR_SIZE_BYTES;
 	}
 
 	public static int objectIndex2PageIndex(int objectIndex) {
@@ -99,6 +100,14 @@ public class ObjectStorage extends AbstractArena {
 
 		private int modelIndex = -1;
 		private int objectCount = 0;
+
+		public void updatePage(int i, int modelIndex, int i1) {
+			var ptr = ptrForPage(pages[i]);
+			MemoryUtil.memPutInt(ptr, modelIndex);
+			MemoryUtil.memPutInt(ptr + 4, i1);
+
+			ObjectStorage.this.needsUpload = true;
+		}
 
 		/**
 		 * Adjust this allocation to the given model index and object count.
@@ -152,6 +161,18 @@ public class ObjectStorage extends AbstractArena {
 			if (!incremental) {
 				// Update all pages.
 				updateRange(0, newLength);
+			}
+		}
+
+		public void updateCount(int newLength) {
+			var oldLength = pages.length;
+			if (oldLength > newLength) {
+				// Eagerly free the now unnecessary pages.
+				// shrink will zero out the pageTable entries for the freed pages.
+				shrink(oldLength, newLength);
+			} else if (oldLength < newLength) {
+				// Allocate new pages to fit the new object count.
+				grow(newLength, oldLength);
 			}
 		}
 

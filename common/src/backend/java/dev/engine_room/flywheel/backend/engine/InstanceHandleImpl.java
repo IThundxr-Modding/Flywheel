@@ -62,8 +62,7 @@ public class InstanceHandleImpl<I extends Instance> implements InstanceHandle {
 				return this;
 			}
 			var instancer = recreate.recreate();
-			instancer.revealInstance(handle, instance);
-			return instancer;
+			return instancer.revealInstance(handle, instance);
 		}
 	}
 
