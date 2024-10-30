@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnknownNullability;
 import org.joml.Vector4fc;
@@ -20,13 +21,12 @@ import dev.engine_room.flywheel.backend.util.AtomicBitSet;
 import dev.engine_room.flywheel.lib.math.MoreMath;
 
 public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> {
-	private final AtomicReference<InstancePage[]> pages;
-
 	private final long instanceStride;
 	private final InstanceWriter<I> writer;
 	private final List<IndirectDraw> associatedDraws = new ArrayList<>();
 	private final Vector4fc boundingSphere;
 
+	private final AtomicReference<InstancePage[]> pages;
 	private final AtomicBitSet changedPages = new AtomicBitSet();
 	private final AtomicBitSet fullPages = new AtomicBitSet();
 	private final Class<I> instanceClass;
@@ -45,7 +45,19 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 
 		instanceClass = (Class<I>) type.create(new InstanceHandleImpl<I>(null))
 				.getClass();
-		pages = new AtomicReference<>((InstancePage[]) Array.newInstance(InstancePage.class, 0));
+		pages = new AtomicReference<>(pageArray(0));
+	}
+
+	@NotNull
+	@SuppressWarnings("unchecked")
+	private InstancePage[] pageArray(int length) {
+		return (InstancePage[]) Array.newInstance(InstancePage.class, length);
+	}
+
+	@NotNull
+	@SuppressWarnings("unchecked")
+	private I[] instanceArray() {
+		return (I[]) Array.newInstance(instanceClass, ObjectStorage.PAGE_SIZE);
 	}
 
 	public final class InstancePage implements InstanceHandleImpl.State<I> {
@@ -57,19 +69,30 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 		 */
 		private final AtomicInteger valid;
 
-		InstancePage(Class<I> clazz, int pageNo) {
+		InstancePage(int pageNo) {
 			this.pageNo = pageNo;
-			this.instances = (I[]) Array.newInstance(clazz, ObjectStorage.PAGE_SIZE);
+			this.instances = instanceArray();
 			this.handles = (InstanceHandleImpl<I>[]) new InstanceHandleImpl[ObjectStorage.PAGE_SIZE];
 			this.valid = new AtomicInteger(0);
 		}
 
+		public int count() {
+			return Integer.bitCount(valid.get());
+		}
+
+		/**
+		 * Attempt to add the given instance/handle to this page.
+		 *
+		 * @param instance The instance to add
+		 * @param handle   The instance's handle
+		 * @return true if the instance was added, false if the page is full
+		 */
 		public boolean add(I instance, InstanceHandleImpl<I> handle) {
 			// Thread safety: we loop until we either win the race and add the given instance, or we
 			// run out of space because other threads trying to add at the same time.
 			while (true) {
 				int currentValue = valid.get();
-				if (currentValue == 0xFFFFFFFF) {
+				if (isFull(currentValue)) {
 					// The page is full, must search elsewhere
 					return false;
 				}
@@ -84,15 +107,22 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 					instances[index] = instance;
 					handles[index] = handle;
 					handle.state = this;
-					handle.index = (pageNo << ObjectStorage.LOG_2_PAGE_SIZE) + index;
+					// Handle index is unique amongst all pages of this instancer.
+					handle.index = local2HandleIndex(index);
 
 					changedPages.set(pageNo);
-					if (newValue == 0xFFFFFFFF) {
+					if (isFull(newValue)) {
+						// The page is now full, mark it so in the bitset.
+						// This is safe because only one bit position changes at a time.
 						fullPages.set(pageNo);
 					}
 					return true;
 				}
 			}
+		}
+
+		private int local2HandleIndex(int index) {
+			return (pageNo << ObjectStorage.LOG_2_PAGE_SIZE) + index;
 		}
 
 		@Override
@@ -114,6 +144,7 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 
 				if (valid.compareAndSet(currentValue, newValue)) {
 					fullPages.clear(pageNo);
+					changedPages.set(pageNo);
 					return InstanceHandleImpl.Deleted.instance();
 				}
 			}
@@ -128,6 +159,56 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 			int localIndex = index % ObjectStorage.PAGE_SIZE;
 
 			return new InstanceHandleImpl.Hidden<>(recreate, instances[localIndex]);
+		}
+
+		public int takeFrom(InstancePage other) {
+			// Fill the holes in this page with instances from the other page.
+
+			int valid = this.valid.get();
+			int otherValid = other.valid.get();
+
+			// If the other page is empty, or we're full, we're done.
+			if (otherValid == 0 || valid == 0xFFFFFFFF) {
+				return valid;
+			}
+
+			// Something is going to change, so mark stuff ahead of time.
+			changedPages.set(pageNo);
+			changedPages.set(other.pageNo);
+
+			for (int i = 0; i < ObjectStorage.PAGE_SIZE; i++) {
+				int mask = 1 << i;
+
+				if ((otherValid & mask) == 0) {
+					continue;
+				}
+
+				int writePos = Integer.numberOfTrailingZeros(~valid);
+
+				instances[writePos] = other.instances[i];
+				handles[writePos] = other.handles[i];
+
+				handles[writePos].state = this;
+				handles[writePos].index = local2HandleIndex(writePos);
+
+				// Clear out the other page.
+				otherValid &= ~mask;
+				other.handles[i] = null;
+				other.instances[i] = null;
+
+				// Set the bit in this page and find the next write position.
+				valid |= 1 << writePos;
+
+				// If we're full, we're done.
+				if (isFull(valid)) {
+					break;
+				}
+			}
+
+			this.valid.set(valid);
+			other.valid.set(otherValid);
+
+			return valid;
 		}
 	}
 
@@ -209,8 +290,45 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 		changedPages.clear();
 	}
 
-	public void removeDeletedInstances() {
+	public void parallelUpdate() {
+		if (true) {
+			// FIXME: infinite loop when the page in readpos doesn't have enough to fill the page in writepos
+			return;
+		}
 
+		var pages = this.pages.get();
+
+		// If there are at least 2 pages with space, we can consolidate.
+		if (fullPages.cardinality() > (pages.length - 2)) {
+			return;
+		}
+
+		// Note this runs after visuals are updated so we don't really have to take care for thread safety.
+
+		int writePos = 0;
+
+		while (true) {
+			writePos = fullPages.nextClearBit(writePos);
+			int readPos = fullPages.nextClearBit(writePos + 1);
+
+			if (writePos >= pages.length || readPos >= pages.length) {
+				break;
+			}
+
+			InstancePage writeTo = pages[writePos];
+			InstancePage readFrom = pages[readPos];
+
+			int validNow = writeTo.takeFrom(readFrom);
+
+			if (isFull(validNow)) {
+				fullPages.set(writePos);
+				writePos = readPos;
+			}
+		}
+	}
+
+	private static boolean isFull(int valid) {
+		return valid == 0xFFFFFFFF;
 	}
 
 	@Override
@@ -319,10 +437,10 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 				// Thread safety: segments contains all pages from the currently visible pages, plus extra.
 				// all pages in the currently visible pages are canonical and will not change.
 				// Can't just `new InstancePage[]` because it has a generic parameter.
-				InstancePage[] newPages = (InstancePage[]) Array.newInstance(InstancePage.class, desiredLength);
+				InstancePage[] newPages = pageArray(desiredLength);
 
 				System.arraycopy(pages, 0, newPages, 0, pages.length);
-				newPages[pages.length] = new InstancePage(instanceClass, pages.length);
+				newPages[pages.length] = new InstancePage(pages.length);
 
 				// because we are using a compareAndSet, if this thread "wins the race" and successfully sets this variable, then the new page becomes canonical.
 				if (this.pages.compareAndSet(pages, newPages)) {
@@ -356,6 +474,9 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 	 * Clear all instances without freeing resources.
 	 */
 	public void clear() {
+		this.pages.set(pageArray(0));
+		changedPages.clear();
+		fullPages.clear();
 
 	}
 }

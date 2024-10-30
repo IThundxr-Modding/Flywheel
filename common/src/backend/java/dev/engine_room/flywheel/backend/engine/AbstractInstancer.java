@@ -20,7 +20,7 @@ public abstract class AbstractInstancer<I extends Instance> implements Instancer
 
 	public abstract int instanceCount();
 
-	public abstract void removeDeletedInstances();
+	public abstract void parallelUpdate();
 
 	public abstract void delete();
 

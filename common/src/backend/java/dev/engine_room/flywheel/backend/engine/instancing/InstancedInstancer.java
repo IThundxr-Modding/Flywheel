@@ -109,7 +109,7 @@ public class InstancedInstancer<I extends Instance> extends BaseInstancer<I> {
         return capacity > vbo.size();
     }
 
-	public void removeDeletedInstances() {
+	public void parallelUpdate() {
 		if (deleted.isEmpty()) {
 			return;
 		}

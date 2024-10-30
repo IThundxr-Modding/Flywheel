@@ -98,70 +98,12 @@ public class ObjectStorage extends AbstractArena {
 		private static final int[] EMPTY_ALLOCATION = new int[0];
 		private int[] pages = EMPTY_ALLOCATION;
 
-		private int modelIndex = -1;
-		private int objectCount = 0;
-
 		public void updatePage(int i, int modelIndex, int i1) {
 			var ptr = ptrForPage(pages[i]);
 			MemoryUtil.memPutInt(ptr, modelIndex);
 			MemoryUtil.memPutInt(ptr + 4, i1);
 
 			ObjectStorage.this.needsUpload = true;
-		}
-
-		/**
-		 * Adjust this allocation to the given model index and object count.
-		 *
-		 * <p>This method triggers eager resizing of the allocation to fit the new object count.
-		 * If the model index is different from the current one, all frame descriptors will be updated.
-		 *
-		 * @param modelIndex The model index the objects in this allocation are associated with.
-		 * @param objectCount The number of objects in this allocation.
-		 */
-		public void update(int modelIndex, int objectCount) {
-			boolean incremental = this.modelIndex == modelIndex;
-
-			if (incremental && objectCount == this.objectCount) {
-				// Nothing will change.
-				return;
-			}
-
-			ObjectStorage.this.needsUpload = true;
-
-			this.modelIndex = modelIndex;
-			this.objectCount = objectCount;
-
-			var oldLength = pages.length;
-			var newLength = objectIndex2PageIndex((objectCount + PAGE_MASK));
-
-			if (oldLength > newLength) {
-				// Eagerly free the now unnecessary pages.
-				// shrink will zero out the pageTable entries for the freed pages.
-				shrink(oldLength, newLength);
-
-				if (incremental) {
-					// Only update the last page, everything else is unchanged.
-					updateRange(newLength - 1, newLength);
-				}
-			} else if (oldLength < newLength) {
-				// Allocate new pages to fit the new object count.
-				grow(newLength, oldLength);
-
-				if (incremental) {
-					// Update the old last page + all new pages
-					updateRange(oldLength - 1, newLength);
-				}
-			} else {
-				if (incremental) {
-					// Only update the last page.
-					updateRange(oldLength - 1, oldLength);
-				}
-			}
-
-			if (!incremental) {
-				// Update all pages.
-				updateRange(0, newLength);
-			}
 		}
 
 		public void updateCount(int newLength) {
@@ -189,35 +131,8 @@ public class ObjectStorage extends AbstractArena {
 				ObjectStorage.this.free(page);
 			}
 			pages = EMPTY_ALLOCATION;
-			modelIndex = -1;
-			objectCount = 0;
 
 			ObjectStorage.this.needsUpload = true;
-		}
-
-		/**
-		 * Calculates the page descriptor for the given page index.
-		 * Runs under the assumption than all pages are full except maybe the last one.
-		 */
-		private int calculatePageDescriptor(int pageIndex) {
-			int countInPage;
-			if (objectCount % PAGE_SIZE != 0 && pageIndex == pages.length - 1) {
-				// Last page && it isn't full -> use the remainder.
-				countInPage = objectCount & PAGE_MASK;
-			} else if (objectCount > 0) {
-				// Full page.
-				countInPage = PAGE_SIZE;
-			} else {
-				// Empty page, this shouldn't be reachable because we eagerly free empty pages.
-				countInPage = 0;
-			}
-			return (modelIndex & 0x3FFFFF) | (countInPage << 26);
-		}
-
-		private void updateRange(int start, int oldLength) {
-			for (int i = start; i < oldLength; i++) {
-				MemoryUtil.memPutInt(ptrForPage(pages[i]), calculatePageDescriptor(i));
-			}
 		}
 
 		private void grow(int neededPages, int oldLength) {
