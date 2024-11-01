@@ -13,6 +13,8 @@ public class ObjectStorage extends AbstractArena {
 	public static final int PAGE_SIZE = 1 << LOG_2_PAGE_SIZE;
 	public static final int PAGE_MASK = PAGE_SIZE - 1;
 
+	public static final int INVALID_PAGE = -1;
+
 	public static final int INITIAL_PAGES_ALLOCATED = 4;
 	public static final int DESCRIPTOR_SIZE_BYTES = Integer.BYTES * 2;
 
@@ -53,8 +55,13 @@ public class ObjectStorage extends AbstractArena {
 
 	@Override
 	public void free(int i) {
+		if (i == INVALID_PAGE) {
+			return;
+		}
 		super.free(i);
-		MemoryUtil.memPutInt(ptrForPage(i), 0);
+		var ptr = ptrForPage(i);
+		MemoryUtil.memPutInt(ptr, 0);
+		MemoryUtil.memPutInt(ptr + 4, 0);
 	}
 
 	@Override
@@ -98,12 +105,47 @@ public class ObjectStorage extends AbstractArena {
 		private static final int[] EMPTY_ALLOCATION = new int[0];
 		private int[] pages = EMPTY_ALLOCATION;
 
-		public void updatePage(int i, int modelIndex, int i1) {
-			var ptr = ptrForPage(pages[i]);
+		public void updatePage(int index, int modelIndex, int validBits) {
+			if (validBits == 0) {
+				holePunch(index);
+				return;
+			}
+			var page = pages[index];
+
+			if (page == INVALID_PAGE) {
+				// Un-holed punch.
+				page = unHolePunch(index);
+			}
+
+			var ptr = ptrForPage(page);
 			MemoryUtil.memPutInt(ptr, modelIndex);
-			MemoryUtil.memPutInt(ptr + 4, i1);
+			MemoryUtil.memPutInt(ptr + 4, validBits);
 
 			ObjectStorage.this.needsUpload = true;
+		}
+
+		/**
+		 * Free a page on the inside of the mapping, maintaining the same virtual mapping size.
+		 *
+		 * @param index The index of the page to free.
+		 */
+		public void holePunch(int index) {
+			ObjectStorage.this.free(pages[index]);
+			pages[index] = INVALID_PAGE;
+
+			ObjectStorage.this.needsUpload = true;
+		}
+
+		/**
+		 * Allocate a new page on the inside of the mapping, maintaining the same virtual mapping size.
+		 *
+		 * @param index The index of the page to allocate.
+		 * @return The allocated page.
+		 */
+		private int unHolePunch(int index) {
+			int page = ObjectStorage.this.alloc();
+			pages[index] = page;
+			return page;
 		}
 
 		public void updateCount(int newLength) {
@@ -122,8 +164,8 @@ public class ObjectStorage extends AbstractArena {
 			return pages.length;
 		}
 
-		public long page2ByteOffset(int page) {
-			return ObjectStorage.this.byteOffsetOf(pages[page]);
+		public long page2ByteOffset(int index) {
+			return ObjectStorage.this.byteOffsetOf(pages[index]);
 		}
 
 		public void delete() {

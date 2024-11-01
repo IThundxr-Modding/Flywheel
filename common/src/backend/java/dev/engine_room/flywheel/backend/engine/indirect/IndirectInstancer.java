@@ -168,7 +168,7 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 			int otherValid = other.valid.get();
 
 			// If the other page is empty, or we're full, we're done.
-			if (otherValid == 0 || valid == 0xFFFFFFFF) {
+			if (isEmpty(otherValid) || isFull(valid)) {
 				return valid;
 			}
 
@@ -223,15 +223,27 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 	public void update(int modelIndex, int baseInstance) {
 		this.baseInstance = baseInstance;
 
-		if (this.modelIndex == modelIndex && changedPages.isEmpty()) {
+		var sameModelIndex = this.modelIndex == modelIndex;
+		if (sameModelIndex && changedPages.isEmpty()) {
+			// Nothing to do!
 			return;
 		}
+
 		this.modelIndex = modelIndex;
+
 		var pages = this.pages.get();
 		mapping.updateCount(pages.length);
 
-		for (int i = 0; i < pages.length; i++) {
-			mapping.updatePage(i, modelIndex, pages[i].valid.get());
+		if (sameModelIndex) {
+			// Only need to update the changed pages.
+			for (int page = changedPages.nextSetBit(0); page >= 0 && page < pages.length; page = changedPages.nextSetBit(page + 1)) {
+				mapping.updatePage(page, modelIndex, pages[page].valid.get());
+			}
+		} else {
+			// Need to update all pages since the model index changed.
+			for (int i = 0; i < pages.length; i++) {
+				mapping.updatePage(i, modelIndex, pages[i].valid.get());
+			}
 		}
 	}
 
@@ -291,44 +303,15 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 	}
 
 	public void parallelUpdate() {
-		if (true) {
-			// FIXME: infinite loop when the page in readpos doesn't have enough to fill the page in writepos
-			return;
-		}
-
-		var pages = this.pages.get();
-
-		// If there are at least 2 pages with space, we can consolidate.
-		if (fullPages.cardinality() > (pages.length - 2)) {
-			return;
-		}
-
-		// Note this runs after visuals are updated so we don't really have to take care for thread safety.
-
-		int writePos = 0;
-
-		while (true) {
-			writePos = fullPages.nextClearBit(writePos);
-			int readPos = fullPages.nextClearBit(writePos + 1);
-
-			if (writePos >= pages.length || readPos >= pages.length) {
-				break;
-			}
-
-			InstancePage writeTo = pages[writePos];
-			InstancePage readFrom = pages[readPos];
-
-			int validNow = writeTo.takeFrom(readFrom);
-
-			if (isFull(validNow)) {
-				fullPages.set(writePos);
-				writePos = readPos;
-			}
-		}
+		// TODO: Merge pages when they're less than half full.
 	}
 
 	private static boolean isFull(int valid) {
 		return valid == 0xFFFFFFFF;
+	}
+
+	private static boolean isEmpty(int otherValid) {
+		return otherValid == 0;
 	}
 
 	@Override
