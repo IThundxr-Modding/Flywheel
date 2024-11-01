@@ -26,14 +26,4 @@ public class FlwImplXplatImpl implements FlwImplXplat {
 	public FlwConfig getConfig() {
 		return NeoForgeFlwConfig.INSTANCE;
 	}
-
-	@Override
-	public boolean useSodium0_6Compat() {
-		return CompatMod.SODIUM.isLoaded && !CompatMod.EMBEDDIUM.isLoaded;
-	}
-
-	@Override
-	public boolean useIrisCompat() {
-		return CompatMod.IRIS.isLoaded || CompatMod.OCULUS.isLoaded;
-	}
 }

@@ -5,7 +5,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
 import dev.engine_room.flywheel.api.visualization.BlockEntityVisualizer;
-import dev.engine_room.flywheel.impl.compat.CompatMods;
 import dev.engine_room.flywheel.impl.compat.SodiumCompat;
 import dev.engine_room.flywheel.impl.extension.BlockEntityTypeExtension;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -29,7 +28,7 @@ abstract class BlockEntityTypeMixin<T extends BlockEntity> implements BlockEntit
 
 	@Override
 	public void flywheel$setVisualizer(@Nullable BlockEntityVisualizer<? super T> visualizer) {
-		if (SodiumCompat.USE_0_6_COMPAT) {
+		if (SodiumCompat.ACTIVE) {
 			flywheel$sodiumPredicate = SodiumCompat.onSetBlockEntityVisualizer((BlockEntityType<T>) (Object) this, flywheel$visualizer, visualizer, flywheel$sodiumPredicate);
 		}
 
