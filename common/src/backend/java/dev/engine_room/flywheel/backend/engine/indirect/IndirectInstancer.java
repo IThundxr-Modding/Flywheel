@@ -27,7 +27,19 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 	private final Vector4fc boundingSphere;
 
 	private final AtomicReference<InstancePage[]> pages;
-	private final AtomicBitSet changedPages = new AtomicBitSet();
+	/**
+	 * The set of pages whose count changed and thus need their descriptor re-uploaded.
+	 */
+	private final AtomicBitSet validityChanged = new AtomicBitSet();
+	/**
+	 * The set of pages whose content changed and thus need their instances re-uploaded.
+	 * Note that we don't re-upload for deletions, as the memory becomes invalid and masked out by the validity bits.
+	 */
+	private final AtomicBitSet contentsChanged = new AtomicBitSet();
+	/**
+	 * The set of pages that are entirely full.
+	 * We scan the clear bits of this set when trying to add an instance.
+	 */
 	private final AtomicBitSet fullPages = new AtomicBitSet();
 	/**
 	 * The set of mergable pages. A page is mergeable if it is not empty and has 16 or fewer instances.
@@ -69,6 +81,7 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 	public final class InstancePage implements InstanceHandleImpl.State<I> {
 		private final int pageNo;
 		private final I[] instances;
+		// Handles are only read in #takeFrom. It would be nice to avoid tracking these at all.
 		private final InstanceHandleImpl<I>[] handles;
 		/**
 		 * A bitset describing which indices in the instances/handles arrays contain live instances.
@@ -116,7 +129,8 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 					// Handle index is unique amongst all pages of this instancer.
 					handle.index = local2HandleIndex(index);
 
-					changedPages.set(pageNo);
+					contentsChanged.set(pageNo);
+					validityChanged.set(pageNo);
 					if (isFull(newValue)) {
 						// The page is now full, mark it so in the bitset.
 						// This is safe because only one bit position changes at a time.
@@ -140,7 +154,7 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 
 		@Override
 		public InstanceHandleImpl.State<I> setChanged(int index) {
-			changedPages.set(pageNo);
+			contentsChanged.set(pageNo);
 			return this;
 		}
 
@@ -156,7 +170,7 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 				int newValue = currentValue & ~(1 << localIndex);
 
 				if (valid.compareAndSet(currentValue, newValue)) {
-					changedPages.set(pageNo);
+					validityChanged.set(pageNo);
 					if (isEmpty(newValue)) {
 						// If we decremented to zero then we're no longer mergeable.
 						mergeablePages.clear(pageNo);
@@ -182,19 +196,21 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 			return new InstanceHandleImpl.Hidden<>(recreate, instances[localIndex]);
 		}
 
-		public void takeFrom(InstancePage other) {
+		/**
+		 * Only call this on 2 pages that are mergeable.
+		 *
+		 * @param other The page to take instances from.
+		 */
+		private void takeFrom(InstancePage other) {
 			// Fill the holes in this page with instances from the other page.
 
 			int valid = this.valid.get();
 			int otherValid = other.valid.get();
 
-			// Something is going to change, so mark stuff ahead of time.
-			changedPages.set(pageNo);
-			changedPages.set(other.pageNo);
-
 			for (int i = 0; i < ObjectStorage.PAGE_SIZE; i++) {
 				int mask = 1 << i;
 
+				// Find set bits in the other page.
 				if ((otherValid & mask) == 0) {
 					continue;
 				}
@@ -212,7 +228,7 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 				other.handles[i] = null;
 				other.instances[i] = null;
 
-				// Set the bit in this page and find the next write position.
+				// Set the bit in this page so we can find the next write position.
 				valid |= 1 << writePos;
 
 				// If we're full, we're done.
@@ -224,9 +240,18 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 			this.valid.set(valid);
 			other.valid.set(otherValid);
 
+			// If the other page was quite empty we may still be mergeable.
 			mergeablePages.set(pageNo, isMergeable(valid));
-			// With all assumptions in place we should have fully drained the other page, but check just to be safe.
-			mergeablePages.set(other.pageNo, isMergeable(otherValid));
+
+			// We definitely changed the contents and validity of this page.
+			contentsChanged.set(pageNo);
+			validityChanged.set(pageNo);
+
+			// The other page will end up empty, so the validity changes and it's no longer mergeable.
+			// Also clear the changed bit so we don't re-upload the instances.
+			contentsChanged.clear(other.pageNo);
+			validityChanged.set(other.pageNo);
+			mergeablePages.clear(other.pageNo);
 
 			if (isFull(valid)) {
 				fullPages.set(pageNo);
@@ -246,7 +271,7 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 		this.baseInstance = baseInstance;
 
 		var sameModelIndex = this.modelIndex == modelIndex;
-		if (sameModelIndex && changedPages.isEmpty()) {
+		if (sameModelIndex && validityChanged.isEmpty()) {
 			// Nothing to do!
 			return;
 		}
@@ -258,7 +283,7 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 
 		if (sameModelIndex) {
 			// Only need to update the changed pages.
-			for (int page = changedPages.nextSetBit(0); page >= 0 && page < pages.length; page = changedPages.nextSetBit(page + 1)) {
+			for (int page = validityChanged.nextSetBit(0); page >= 0 && page < pages.length; page = validityChanged.nextSetBit(page + 1)) {
 				mapping.updatePage(page, modelIndex, pages[page].valid.get());
 			}
 		} else {
@@ -267,6 +292,8 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 				mapping.updatePage(i, modelIndex, pages[i].valid.get());
 			}
 		}
+
+		validityChanged.clear();
 	}
 
 	public void writeModel(long ptr) {
@@ -280,15 +307,21 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 	}
 
 	public void uploadInstances(StagingBuffer stagingBuffer, int instanceVbo) {
-		if (changedPages.isEmpty()) {
+		if (contentsChanged.isEmpty()) {
 			return;
 		}
 
 		var pages = this.pages.get();
-		for (int page = changedPages.nextSetBit(0); page >= 0 && page < pages.length; page = changedPages.nextSetBit(page + 1)) {
+		for (int page = contentsChanged.nextSetBit(0); page >= 0 && page < pages.length; page = contentsChanged.nextSetBit(page + 1)) {
 			var instances = pages[page].instances;
 
 			long baseByte = mapping.page2ByteOffset(page);
+
+			if (baseByte < 0) {
+				// This page is not mapped to the VBO.
+				continue;
+			}
+
 			long size = ObjectStorage.PAGE_SIZE * instanceStride;
 
 			// Because writes are broken into pages, we end up with significantly more calls into
@@ -321,7 +354,7 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 			stagingBuffer.enqueueCopy(block.ptr(), size, instanceVbo, baseByte);
 		}
 
-		changedPages.clear();
+		contentsChanged.clear();
 	}
 
 	public void parallelUpdate() {
@@ -501,7 +534,7 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 	 */
 	public void clear() {
 		this.pages.set(pageArray(0));
-		changedPages.clear();
+		contentsChanged.clear();
 		fullPages.clear();
 
 	}

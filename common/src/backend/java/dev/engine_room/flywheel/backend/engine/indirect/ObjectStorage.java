@@ -1,6 +1,7 @@
 package dev.engine_room.flywheel.backend.engine.indirect;
 
 import java.util.Arrays;
+import java.util.BitSet;
 
 import org.lwjgl.system.MemoryUtil;
 
@@ -18,6 +19,7 @@ public class ObjectStorage extends AbstractArena {
 	public static final int INITIAL_PAGES_ALLOCATED = 4;
 	public static final int DESCRIPTOR_SIZE_BYTES = Integer.BYTES * 2;
 
+	private final BitSet changedFrames = new BitSet();
 	/**
 	 * The GPU side buffer containing all the objects, logically divided into page frames.
 	 */
@@ -30,8 +32,6 @@ public class ObjectStorage extends AbstractArena {
 	 * The CPU side memory block containing the page descriptors.
 	 */
 	private MemoryBlock frameDescriptors;
-
-	private boolean needsUpload = false;
 
 	public ObjectStorage(long objectSizeBytes) {
 		super(PAGE_SIZE * objectSizeBytes);
@@ -62,6 +62,16 @@ public class ObjectStorage extends AbstractArena {
 		var ptr = ptrForPage(i);
 		MemoryUtil.memPutInt(ptr, 0);
 		MemoryUtil.memPutInt(ptr + 4, 0);
+
+		changedFrames.set(i);
+	}
+
+	private void set(int i, int modelIndex, int validBits) {
+		var ptr = ptrForPage(i);
+		MemoryUtil.memPutInt(ptr, modelIndex);
+		MemoryUtil.memPutInt(ptr + 4, validBits);
+
+		changedFrames.set(i);
 	}
 
 	@Override
@@ -72,12 +82,17 @@ public class ObjectStorage extends AbstractArena {
 	}
 
 	public void uploadDescriptors(StagingBuffer stagingBuffer) {
-		if (!needsUpload) {
+		if (changedFrames.isEmpty()) {
 			return;
 		}
-		// We could be smarter about which spans are uploaded but this thing is so small it's probably not worth it.
-		stagingBuffer.enqueueCopy(frameDescriptors.ptr(), frameDescriptors.size(), frameDescriptorBuffer.handle(), 0);
-		needsUpload = false;
+
+		var ptr = frameDescriptors.ptr();
+		for (int i = changedFrames.nextSetBit(0); i >= 0 && i < capacity(); i = changedFrames.nextSetBit(i + 1)) {
+			var offset = (long) i * DESCRIPTOR_SIZE_BYTES;
+			stagingBuffer.enqueueCopy(ptr + offset, DESCRIPTOR_SIZE_BYTES, frameDescriptorBuffer.handle(), offset);
+		}
+
+		changedFrames.clear();
 	}
 
 	public void delete() {
@@ -110,18 +125,14 @@ public class ObjectStorage extends AbstractArena {
 				holePunch(index);
 				return;
 			}
-			var page = pages[index];
+			var frame = pages[index];
 
-			if (page == INVALID_PAGE) {
+			if (frame == INVALID_PAGE) {
 				// Un-holed punch.
-				page = unHolePunch(index);
+				frame = unHolePunch(index);
 			}
 
-			var ptr = ptrForPage(page);
-			MemoryUtil.memPutInt(ptr, modelIndex);
-			MemoryUtil.memPutInt(ptr + 4, validBits);
-
-			ObjectStorage.this.needsUpload = true;
+			ObjectStorage.this.set(frame, modelIndex, validBits);
 		}
 
 		/**
@@ -132,8 +143,6 @@ public class ObjectStorage extends AbstractArena {
 		public void holePunch(int index) {
 			ObjectStorage.this.free(pages[index]);
 			pages[index] = INVALID_PAGE;
-
-			ObjectStorage.this.needsUpload = true;
 		}
 
 		/**
@@ -173,8 +182,6 @@ public class ObjectStorage extends AbstractArena {
 				ObjectStorage.this.free(page);
 			}
 			pages = EMPTY_ALLOCATION;
-
-			ObjectStorage.this.needsUpload = true;
 		}
 
 		private void grow(int neededPages, int oldLength) {
