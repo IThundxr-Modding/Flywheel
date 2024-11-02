@@ -29,6 +29,12 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 	private final AtomicReference<InstancePage[]> pages;
 	private final AtomicBitSet changedPages = new AtomicBitSet();
 	private final AtomicBitSet fullPages = new AtomicBitSet();
+	/**
+	 * The set of mergable pages. A page is mergeable if it is not empty and has 16 or fewer instances.
+	 * These constraints are set so that we can guarantee that merging two pages leaves one entirely empty,
+	 * but we also don't want to waste work merging into pages that are already empty.
+	 */
+	private final AtomicBitSet mergeablePages = new AtomicBitSet();
 	private final Class<I> instanceClass;
 
 	public ObjectStorage.@UnknownNullability Mapping mapping;
@@ -116,6 +122,13 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 						// This is safe because only one bit position changes at a time.
 						fullPages.set(pageNo);
 					}
+					if (isEmpty(currentValue)) {
+						// Value we just saw was zero, so since we added something we are now mergeable!
+						mergeablePages.set(pageNo);
+					} else if (Integer.bitCount(currentValue) == 16) {
+						// We just filled the 17th instance, so we are no longer mergeable.
+						mergeablePages.clear(pageNo);
+					}
 					return true;
 				}
 			}
@@ -143,8 +156,16 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 				int newValue = currentValue & ~(1 << localIndex);
 
 				if (valid.compareAndSet(currentValue, newValue)) {
-					fullPages.clear(pageNo);
 					changedPages.set(pageNo);
+					if (isEmpty(newValue)) {
+						// If we decremented to zero then we're no longer mergeable.
+						mergeablePages.clear(pageNo);
+					} else if (Integer.bitCount(newValue) == 16) {
+						// If we decremented to 16 then we're now mergeable.
+						mergeablePages.set(pageNo);
+					}
+					// Set full page last so that other threads don't race to set the other bitsets.
+					fullPages.clear(pageNo);
 					return InstanceHandleImpl.Deleted.instance();
 				}
 			}
@@ -161,16 +182,11 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 			return new InstanceHandleImpl.Hidden<>(recreate, instances[localIndex]);
 		}
 
-		public int takeFrom(InstancePage other) {
+		public void takeFrom(InstancePage other) {
 			// Fill the holes in this page with instances from the other page.
 
 			int valid = this.valid.get();
 			int otherValid = other.valid.get();
-
-			// If the other page is empty, or we're full, we're done.
-			if (isEmpty(otherValid) || isFull(valid)) {
-				return valid;
-			}
 
 			// Something is going to change, so mark stuff ahead of time.
 			changedPages.set(pageNo);
@@ -208,7 +224,13 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 			this.valid.set(valid);
 			other.valid.set(otherValid);
 
-			return valid;
+			mergeablePages.set(pageNo, isMergeable(valid));
+			// With all assumptions in place we should have fully drained the other page, but check just to be safe.
+			mergeablePages.set(other.pageNo, isMergeable(otherValid));
+
+			if (isFull(valid)) {
+				fullPages.set(pageNo);
+			}
 		}
 	}
 
@@ -303,15 +325,36 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 	}
 
 	public void parallelUpdate() {
-		// TODO: Merge pages when they're less than half full.
+		var pages = this.pages.get();
+
+		int page = 0;
+		while (mergeablePages.cardinality() > 1) {
+			page = mergeablePages.nextSetBit(page);
+			if (page < 0) {
+				break;
+			}
+
+			// Find the next mergeable page.
+			int next = mergeablePages.nextSetBit(page + 1);
+			if (next < 0) {
+				break;
+			}
+
+			// Try to merge the pages.
+			pages[page].takeFrom(pages[next]);
+		}
 	}
 
 	private static boolean isFull(int valid) {
 		return valid == 0xFFFFFFFF;
 	}
 
-	private static boolean isEmpty(int otherValid) {
-		return otherValid == 0;
+	private static boolean isEmpty(int valid) {
+		return valid == 0;
+	}
+
+	private static boolean isMergeable(int valid) {
+		return !isEmpty(valid) && Integer.bitCount(valid) <= 16;
 	}
 
 	@Override
