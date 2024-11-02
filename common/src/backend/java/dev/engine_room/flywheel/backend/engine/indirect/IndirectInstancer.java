@@ -1,12 +1,10 @@
 package dev.engine_room.flywheel.backend.engine.indirect;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnknownNullability;
 import org.joml.Vector4fc;
@@ -26,7 +24,7 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 	private final List<IndirectDraw> associatedDraws = new ArrayList<>();
 	private final Vector4fc boundingSphere;
 
-	private final AtomicReference<InstancePage[]> pages;
+	private final AtomicReference<InstancePage<I>[]> pages = new AtomicReference<>(pageArray(0));
 	/**
 	 * The set of pages whose count changed and thus need their descriptor re-uploaded.
 	 */
@@ -47,7 +45,6 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 	 * but we also don't want to waste work merging into pages that are already empty.
 	 */
 	private final AtomicBitSet mergeablePages = new AtomicBitSet();
-	private final Class<I> instanceClass;
 
 	public ObjectStorage.@UnknownNullability Mapping mapping;
 
@@ -60,25 +57,25 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 				.byteSize());
 		writer = this.type.writer();
 		boundingSphere = key.model().boundingSphere();
-
-		instanceClass = (Class<I>) type.create(new InstanceHandleImpl<I>(null))
-				.getClass();
-		pages = new AtomicReference<>(pageArray(0));
 	}
 
-	@NotNull
 	@SuppressWarnings("unchecked")
-	private InstancePage[] pageArray(int length) {
-		return (InstancePage[]) Array.newInstance(InstancePage.class, length);
+	private static <I extends Instance> InstancePage<I>[] pageArray(int length) {
+		return new InstancePage[length];
 	}
 
-	@NotNull
 	@SuppressWarnings("unchecked")
-	private I[] instanceArray() {
-		return (I[]) Array.newInstance(instanceClass, ObjectStorage.PAGE_SIZE);
+	private static <I extends Instance> I[] instanceArray() {
+		return (I[]) new Instance[ObjectStorage.PAGE_SIZE];
 	}
 
-	public final class InstancePage implements InstanceHandleImpl.State<I> {
+	@SuppressWarnings("unchecked")
+	private static <I extends Instance> InstanceHandleImpl<I>[] handleArray() {
+		return new InstanceHandleImpl[ObjectStorage.PAGE_SIZE];
+	}
+
+	private static final class InstancePage<I extends Instance> implements InstanceHandleImpl.State<I> {
+		private final IndirectInstancer<I> parent;
 		private final int pageNo;
 		private final I[] instances;
 		// Handles are only read in #takeFrom. It would be nice to avoid tracking these at all.
@@ -88,15 +85,12 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 		 */
 		private final AtomicInteger valid;
 
-		InstancePage(int pageNo) {
+		private InstancePage(IndirectInstancer<I> parent, int pageNo) {
+			this.parent = parent;
 			this.pageNo = pageNo;
 			this.instances = instanceArray();
-			this.handles = (InstanceHandleImpl<I>[]) new InstanceHandleImpl[ObjectStorage.PAGE_SIZE];
+			this.handles = handleArray();
 			this.valid = new AtomicInteger(0);
-		}
-
-		public int count() {
-			return Integer.bitCount(valid.get());
 		}
 
 		/**
@@ -129,19 +123,19 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 					// Handle index is unique amongst all pages of this instancer.
 					handle.index = local2HandleIndex(index);
 
-					contentsChanged.set(pageNo);
-					validityChanged.set(pageNo);
+					parent.contentsChanged.set(pageNo);
+					parent.validityChanged.set(pageNo);
 					if (isFull(newValue)) {
 						// The page is now full, mark it so in the bitset.
 						// This is safe because only one bit position changes at a time.
-						fullPages.set(pageNo);
+						parent.fullPages.set(pageNo);
 					}
 					if (isEmpty(currentValue)) {
 						// Value we just saw was zero, so since we added something we are now mergeable!
-						mergeablePages.set(pageNo);
+						parent.mergeablePages.set(pageNo);
 					} else if (Integer.bitCount(currentValue) == 16) {
 						// We just filled the 17th instance, so we are no longer mergeable.
-						mergeablePages.clear(pageNo);
+						parent.mergeablePages.clear(pageNo);
 					}
 					return true;
 				}
@@ -154,7 +148,7 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 
 		@Override
 		public InstanceHandleImpl.State<I> setChanged(int index) {
-			contentsChanged.set(pageNo);
+			parent.contentsChanged.set(pageNo);
 			return this;
 		}
 
@@ -170,16 +164,16 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 				int newValue = currentValue & ~(1 << localIndex);
 
 				if (valid.compareAndSet(currentValue, newValue)) {
-					validityChanged.set(pageNo);
+					parent.validityChanged.set(pageNo);
 					if (isEmpty(newValue)) {
 						// If we decremented to zero then we're no longer mergeable.
-						mergeablePages.clear(pageNo);
+						parent.mergeablePages.clear(pageNo);
 					} else if (Integer.bitCount(newValue) == 16) {
 						// If we decremented to 16 then we're now mergeable.
-						mergeablePages.set(pageNo);
+						parent.mergeablePages.set(pageNo);
 					}
 					// Set full page last so that other threads don't race to set the other bitsets.
-					fullPages.clear(pageNo);
+					parent.fullPages.clear(pageNo);
 					return InstanceHandleImpl.Deleted.instance();
 				}
 			}
@@ -193,7 +187,7 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 
 			int localIndex = index % ObjectStorage.PAGE_SIZE;
 
-			return new InstanceHandleImpl.Hidden<>(recreate, instances[localIndex]);
+			return new InstanceHandleImpl.Hidden<>(parent.recreate, instances[localIndex]);
 		}
 
 		/**
@@ -201,7 +195,7 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 		 *
 		 * @param other The page to take instances from.
 		 */
-		private void takeFrom(InstancePage other) {
+		private void takeFrom(InstancePage<I> other) {
 			// Fill the holes in this page with instances from the other page.
 
 			int valid = this.valid.get();
@@ -241,20 +235,20 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 			other.valid.set(otherValid);
 
 			// If the other page was quite empty we may still be mergeable.
-			mergeablePages.set(pageNo, isMergeable(valid));
+			parent.mergeablePages.set(pageNo, isMergeable(valid));
 
 			// We definitely changed the contents and validity of this page.
-			contentsChanged.set(pageNo);
-			validityChanged.set(pageNo);
+			parent.contentsChanged.set(pageNo);
+			parent.validityChanged.set(pageNo);
 
 			// The other page will end up empty, so the validity changes and it's no longer mergeable.
 			// Also clear the changed bit so we don't re-upload the instances.
-			contentsChanged.clear(other.pageNo);
-			validityChanged.set(other.pageNo);
-			mergeablePages.clear(other.pageNo);
+			parent.contentsChanged.clear(other.pageNo);
+			parent.validityChanged.set(other.pageNo);
+			parent.mergeablePages.clear(other.pageNo);
 
 			if (isFull(valid)) {
-				fullPages.set(pageNo);
+				parent.fullPages.set(pageNo);
 			}
 		}
 	}
@@ -456,8 +450,10 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 		//  That seems kinda impossible so I'm fine leaving it as is for now.
 
 		// Add the instance to this instancer.
-		if (handle.state instanceof InstancePage other) {
-			// TODO: shortcut here if we already own the instance
+		if (handle.state instanceof InstancePage<?> other) {
+			if (other.parent == this) {
+				return;
+			}
 
 			// Remove the instance from its old instancer.
 			// This won't have any unwanted effect when the old instancer
@@ -496,10 +492,10 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 				// Thread safety: segments contains all pages from the currently visible pages, plus extra.
 				// all pages in the currently visible pages are canonical and will not change.
 				// Can't just `new InstancePage[]` because it has a generic parameter.
-				InstancePage[] newPages = pageArray(desiredLength);
+				InstancePage<I>[] newPages = pageArray(desiredLength);
 
 				System.arraycopy(pages, 0, newPages, 0, pages.length);
-				newPages[pages.length] = new InstancePage(pages.length);
+				newPages[pages.length] = new InstancePage<>(this, pages.length);
 
 				// because we are using a compareAndSet, if this thread "wins the race" and successfully sets this variable, then the new page becomes canonical.
 				if (this.pages.compareAndSet(pages, newPages)) {
@@ -535,7 +531,8 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 	public void clear() {
 		this.pages.set(pageArray(0));
 		contentsChanged.clear();
+		validityChanged.clear();
 		fullPages.clear();
-
+		mergeablePages.clear();
 	}
 }
