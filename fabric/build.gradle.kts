@@ -10,7 +10,6 @@ plugins {
 val api = sourceSets.create("api")
 val lib = sourceSets.create("lib")
 val backend = sourceSets.create("backend")
-val stubs = sourceSets.create("stubs")
 val main = sourceSets.getByName("main")
 
 transitiveSourceSets {
@@ -27,12 +26,7 @@ transitiveSourceSets {
         rootCompile()
         compile(api, lib)
     }
-    sourceSet(stubs) {
-        rootCompile()
-    }
     sourceSet(main) {
-        // Don't want stubs at runtime
-        compile(stubs)
         implementation(api, lib, backend)
     }
 
@@ -41,7 +35,7 @@ transitiveSourceSets {
 
 platform {
     commonProject = project(":common")
-    compileWithCommonSourceSets(api, lib, backend, stubs, main)
+    compileWithCommonSourceSets(api, lib, backend, main)
     setupLoomMod(api, lib, backend, main)
     setupLoomRuns()
     setupFatJar(api, lib, backend, main)
@@ -83,6 +77,5 @@ dependencies {
     "forApi"(project(path = ":common", configuration = "commonApiOnly"))
     "forLib"(project(path = ":common", configuration = "commonLib"))
     "forBackend"(project(path = ":common", configuration = "commonBackend"))
-    "forStubs"(project(path = ":common", configuration = "commonStubs"))
     "forMain"(project(path = ":common", configuration = "commonImpl"))
 }

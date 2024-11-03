@@ -9,7 +9,6 @@ plugins {
 val api = sourceSets.create("api")
 val lib = sourceSets.create("lib")
 val backend = sourceSets.create("backend")
-val stubs = sourceSets.create("stubs")
 val main = sourceSets.getByName("main")
 
 transitiveSourceSets {
@@ -26,11 +25,8 @@ transitiveSourceSets {
         rootCompile()
         compile(api, lib)
     }
-    sourceSet(stubs) {
-        rootCompile()
-    }
     sourceSet(main) {
-        compile(api, lib, backend, stubs)
+        compile(api, lib, backend)
     }
     sourceSet(sourceSets.getByName("test")) {
         implementation(api, lib, backend)
@@ -46,7 +42,6 @@ jarSets {
     outgoing("commonApiOnly", api)
     outgoing("commonLib", lib)
     outgoing("commonBackend", backend)
-    outgoing("commonStubs", stubs)
     outgoing("commonImpl", main)
 
     // For publishing.
