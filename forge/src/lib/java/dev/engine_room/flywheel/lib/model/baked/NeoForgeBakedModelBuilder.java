@@ -2,8 +2,6 @@ package dev.engine_room.flywheel.lib.model.baked;
 
 import java.util.function.BiFunction;
 
-import org.jetbrains.annotations.Nullable;
-
 import com.mojang.blaze3d.vertex.PoseStack;
 
 import dev.engine_room.flywheel.api.material.Material;
@@ -15,12 +13,8 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.client.model.data.ModelData;
 
 public final class NeoForgeBakedModelBuilder extends BakedModelBuilder {
-	@Nullable
-	private ModelData modelData;
-
 	public NeoForgeBakedModelBuilder(BakedModel bakedModel) {
 		super(bakedModel);
 	}
@@ -49,23 +43,15 @@ public final class NeoForgeBakedModelBuilder extends BakedModelBuilder {
 		return this;
 	}
 
-	public NeoForgeBakedModelBuilder modelData(ModelData modelData) {
-		this.modelData = modelData;
-		return this;
-	}
-
 	@Override
 	public SimpleModel build() {
 		if (materialFunc == null) {
 			materialFunc = ModelUtil::getMaterial;
 		}
-		if (modelData == null) {
-			modelData = ModelData.EMPTY;
-		}
 
 		var builder = ChunkLayerSortedListBuilder.<Model.ConfiguredMesh>getThreadLocal();
 
-		BakedModelBufferer.bufferSingle(ModelUtil.VANILLA_RENDERER.getModelRenderer(), level, bakedModel, blockState, poseStack, modelData, (renderType, shaded, data) -> {
+		BakedModelBufferer.bufferSingle(ModelUtil.VANILLA_RENDERER.getModelRenderer(), level, bakedModel, blockState, poseStack, (renderType, shaded, data) -> {
 			Material material = materialFunc.apply(renderType, shaded);
 			if (material != null) {
 				Mesh mesh = MeshHelper.blockVerticesToMesh(data, "source=BakedModelBuilder," + "bakedModel=" + bakedModel + ",renderType=" + renderType + ",shaded=" + shaded);

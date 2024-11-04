@@ -9,13 +9,13 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 
-import dev.engine_room.flywheel.impl.mixin.BufferBuilderAccessor;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 
 class MeshEmitter implements VertexConsumer {
 	private final RenderType renderType;
 	private final ByteBufferBuilder byteBufferBuilder;
+	@UnknownNullability
 	private BufferBuilder bufferBuilder;
 
 	private BakedModelBufferer.@UnknownNullability ResultConsumer resultConsumer;
@@ -24,7 +24,6 @@ class MeshEmitter implements VertexConsumer {
 	MeshEmitter(RenderType renderType) {
 		this.renderType = renderType;
 		this.byteBufferBuilder = new ByteBufferBuilder(renderType.bufferSize());
-		this.bufferBuilder = new BufferBuilder(byteBufferBuilder, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
 	}
 
 	public void prepare(BakedModelBufferer.ResultConsumer resultConsumer) {
@@ -32,7 +31,7 @@ class MeshEmitter implements VertexConsumer {
 	}
 
 	public void end() {
-		if (((BufferBuilderAccessor) bufferBuilder).flywheel$getBuilding()) {
+		if (bufferBuilder != null) {
 			emit();
 		}
 		resultConsumer = null;
@@ -43,11 +42,12 @@ class MeshEmitter implements VertexConsumer {
 		return bufferBuilder;
 	}
 
-	void prepareForGeometry(boolean shade) {
-		if (!((BufferBuilderAccessor) bufferBuilder).flywheel$getBuilding()) {
+	private void prepareForGeometry(boolean shade) {
+		if (bufferBuilder == null) {
 			bufferBuilder = new BufferBuilder(byteBufferBuilder, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
 		} else if (shade != currentShade) {
 			emit();
+			bufferBuilder = new BufferBuilder(byteBufferBuilder, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
 		}
 
 		currentShade = shade;
@@ -58,14 +58,13 @@ class MeshEmitter implements VertexConsumer {
 	}
 
 	private void emit() {
-		var renderedBuffer = bufferBuilder.build();
+		var data = bufferBuilder.build();
+		bufferBuilder = null;
 
-		if (renderedBuffer != null) {
-			resultConsumer.accept(renderType, currentShade, renderedBuffer);
-			renderedBuffer.close();
+		if (data != null) {
+			resultConsumer.accept(renderType, currentShade, data);
+			data.close();
 		}
-
-		bufferBuilder = new BufferBuilder(byteBufferBuilder, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
 	}
 
 	@Override

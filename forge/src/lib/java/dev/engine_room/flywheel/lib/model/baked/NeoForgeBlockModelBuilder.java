@@ -2,8 +2,6 @@ package dev.engine_room.flywheel.lib.model.baked;
 
 import java.util.function.BiFunction;
 
-import org.jetbrains.annotations.Nullable;
-
 import com.mojang.blaze3d.vertex.PoseStack;
 
 import dev.engine_room.flywheel.api.material.Material;
@@ -14,12 +12,8 @@ import dev.engine_room.flywheel.lib.model.SimpleModel;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.client.model.data.ModelData;
 
 public final class NeoForgeBlockModelBuilder extends BlockModelBuilder {
-	@Nullable
-	private ModelData modelData;
-
 	public NeoForgeBlockModelBuilder(BlockState state) {
 		super(state);
 	}
@@ -42,23 +36,15 @@ public final class NeoForgeBlockModelBuilder extends BlockModelBuilder {
 		return this;
 	}
 
-	public NeoForgeBlockModelBuilder modelData(ModelData modelData) {
-		this.modelData = modelData;
-		return this;
-	}
-
 	@Override
 	public SimpleModel build() {
 		if (materialFunc == null) {
 			materialFunc = ModelUtil::getMaterial;
 		}
-		if (modelData == null) {
-			modelData = ModelData.EMPTY;
-		}
 
 		var builder = ChunkLayerSortedListBuilder.<Model.ConfiguredMesh>getThreadLocal();
 
-		BakedModelBufferer.bufferBlock(ModelUtil.VANILLA_RENDERER, level, state, poseStack, modelData, (renderType, shaded, data) -> {
+		BakedModelBufferer.bufferBlock(ModelUtil.VANILLA_RENDERER, level, state, poseStack, (renderType, shaded, data) -> {
 			Material material = materialFunc.apply(renderType, shaded);
 			if (material != null) {
 				Mesh mesh = MeshHelper.blockVerticesToMesh(data, "source=BlockModelBuilder," + "blockState=" + state + ",renderType=" + renderType + ",shaded=" + shaded);

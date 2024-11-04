@@ -1,7 +1,6 @@
 package dev.engine_room.flywheel.lib.model.baked;
 
 import java.util.Iterator;
-import java.util.function.Function;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -33,7 +32,7 @@ final class BakedModelBufferer {
 	private BakedModelBufferer() {
 	}
 
-	public static void bufferSingle(ModelBlockRenderer blockRenderer, @Nullable BlockAndTintGetter level, BakedModel model, @Nullable BlockState state, @Nullable PoseStack poseStack, ModelData modelData, ResultConsumer resultConsumer) {
+	public static void bufferSingle(ModelBlockRenderer blockRenderer, @Nullable BlockAndTintGetter level, BakedModel model, @Nullable BlockState state, @Nullable PoseStack poseStack, ResultConsumer resultConsumer) {
 		ThreadLocalObjects objects = THREAD_LOCAL_OBJECTS.get();
 		if (level == null) {
 			if (state == null) {
@@ -51,7 +50,7 @@ final class BakedModelBufferer {
 		RandomSource random = objects.random;
 		MeshEmitter[] emitters = objects.emitters;
 
-		modelData = model.getModelData(level, BlockPos.ZERO, state, modelData);
+		ModelData modelData = model.getModelData(level, BlockPos.ZERO, state, level.getModelData(BlockPos.ZERO));
 		random.setSeed(42L);
 		ChunkRenderTypeSet renderTypes = model.getRenderTypes(state, random, modelData);
 
@@ -69,15 +68,15 @@ final class BakedModelBufferer {
 		}
 	}
 
-	public static void bufferBlock(BlockRenderDispatcher renderDispatcher, @Nullable BlockAndTintGetter level, BlockState state, @Nullable PoseStack poseStack, ModelData modelData, ResultConsumer resultConsumer) {
+	public static void bufferBlock(BlockRenderDispatcher renderDispatcher, @Nullable BlockAndTintGetter level, BlockState state, @Nullable PoseStack poseStack, ResultConsumer resultConsumer) {
 		if (state.getRenderShape() != RenderShape.MODEL) {
 			return;
 		}
 
-		bufferSingle(renderDispatcher.getModelRenderer(), level, renderDispatcher.getBlockModel(state), state, poseStack, modelData, resultConsumer);
+		bufferSingle(renderDispatcher.getModelRenderer(), level, renderDispatcher.getBlockModel(state), state, poseStack, resultConsumer);
 	}
 
-	public static void bufferMultiBlock(BlockRenderDispatcher renderDispatcher, Iterator<BlockPos> posIterator, BlockAndTintGetter level, @Nullable PoseStack poseStack, Function<BlockPos, ModelData> modelDataLookup, boolean renderFluids, ResultConsumer resultConsumer) {
+	public static void bufferMultiBlock(BlockRenderDispatcher renderDispatcher, Iterator<BlockPos> posIterator, BlockAndTintGetter level, @Nullable PoseStack poseStack, boolean renderFluids, ResultConsumer resultConsumer) {
 		ThreadLocalObjects objects = THREAD_LOCAL_OBJECTS.get();
 		if (poseStack == null) {
 			poseStack = objects.identityPoseStack;
@@ -116,8 +115,7 @@ final class BakedModelBufferer {
 			if (state.getRenderShape() == RenderShape.MODEL) {
 				long seed = state.getSeed(pos);
 				BakedModel model = renderDispatcher.getBlockModel(state);
-				ModelData modelData = modelDataLookup.apply(pos);
-				modelData = model.getModelData(level, pos, state, modelData);
+				ModelData modelData = model.getModelData(level, pos, state, level.getModelData(pos));
 				random.setSeed(seed);
 				ChunkRenderTypeSet renderTypes = model.getRenderTypes(state, random, modelData);
 

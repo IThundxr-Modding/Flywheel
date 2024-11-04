@@ -14,9 +14,8 @@ class VertexWriter implements VertexConsumer {
 	private MemoryBlock data;
 
 	private int vertexCount;
-	private boolean filledPosition;
-	private boolean filledTexture;
-	private boolean filledNormal;
+	private boolean filledTexture = true;
+	private boolean filledNormal = true;
 
 	public VertexWriter() {
 		data = MemoryBlock.malloc(128 * STRIDE);
@@ -24,20 +23,29 @@ class VertexWriter implements VertexConsumer {
 
 	@Override
 	public VertexConsumer addVertex(float x, float y, float z) {
-		if (!filledPosition) {
-			long ptr = vertexPtr();
-			MemoryUtil.memPutFloat(ptr, x);
-			MemoryUtil.memPutFloat(ptr + 4, y);
-			MemoryUtil.memPutFloat(ptr + 8, z);
-			filledPosition = true;
+		endLastVertex();
+		vertexCount++;
+
+		long byteSize = vertexCount * STRIDE;
+		long capacity = data.size();
+		if (byteSize > capacity) {
+			data = data.realloc(capacity * 2);
 		}
-		return endVertexIfNeeded();
+
+		filledTexture = false;
+		filledNormal = false;
+
+		long ptr = vertexPtr();
+		MemoryUtil.memPutFloat(ptr, x);
+		MemoryUtil.memPutFloat(ptr + 4, y);
+		MemoryUtil.memPutFloat(ptr + 8, z);
+		return this;
 	}
 
 	@Override
 	public VertexConsumer setColor(int red, int green, int blue, int alpha) {
 		// ignore color
-		return endVertexIfNeeded();
+		return this;
 	}
 
 	@Override
@@ -48,19 +56,19 @@ class VertexWriter implements VertexConsumer {
 			MemoryUtil.memPutFloat(ptr + 16, v);
 			filledTexture = true;
 		}
-		return endVertexIfNeeded();
+		return this;
 	}
 
 	@Override
 	public VertexConsumer setUv1(int u, int v) {
 		// ignore overlay
-		return endVertexIfNeeded();
+		return this;
 	}
 
 	@Override
 	public VertexConsumer setUv2(int u, int v) {
 		// ignore light
-		return endVertexIfNeeded();
+		return this;
 	}
 
 	@Override
@@ -72,26 +80,6 @@ class VertexWriter implements VertexConsumer {
 			MemoryUtil.memPutByte(ptr + 22, DataPacker.packNormI8(z));
 			filledNormal = true;
 		}
-		return endVertexIfNeeded();
-	}
-
-	public VertexConsumer endVertexIfNeeded() {
-		if (!filledPosition || !filledTexture || !filledNormal) {
-			// We do not throw here as that matched what vanilla does
-			return this;
-		}
-
-		filledPosition = false;
-		filledTexture = false;
-		filledNormal = false;
-		vertexCount++;
-
-		long byteSize = (vertexCount + 1) * STRIDE;
-		long capacity = data.size();
-		if (byteSize > capacity) {
-			data = data.realloc(capacity * 2);
-		}
-
 		return this;
 	}
 
@@ -99,14 +87,23 @@ class VertexWriter implements VertexConsumer {
 		return data.ptr() + vertexCount * STRIDE;
 	}
 
+	private void endLastVertex() {
+		if (vertexCount != 0) {
+			if (!filledTexture || !filledNormal) {
+				throw new IllegalStateException("Missing elements in vertex");
+			}
+		}
+	}
+
 	public MemoryBlock copyDataAndReset() {
+		endLastVertex();
+
 		MemoryBlock dataCopy = MemoryBlock.mallocTracked(vertexCount * STRIDE);
 		data.copyTo(dataCopy);
 
 		vertexCount = 0;
-		filledPosition = false;
-		filledTexture = false;
-		filledNormal = false;
+		filledTexture = true;
+		filledNormal = true;
 
 		return dataCopy;
 	}
