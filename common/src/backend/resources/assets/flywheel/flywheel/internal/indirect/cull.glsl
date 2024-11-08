@@ -102,19 +102,14 @@ bool _flw_isVisible(uint instanceIndex, uint modelIndex) {
 
             // Clamp to the texture bounds.
             // Since we're not going through a sampler out of bounds texel fetches will return 0.
-            bounds = clamp(bounds, ivec4(0), levelSizePair);
+            bounds = clamp(bounds, ivec4(0), levelSizePair - ivec4(1));
 
             float depth01 = texelFetch(_flw_depthPyramid, bounds.xw, level).r;
             float depth11 = texelFetch(_flw_depthPyramid, bounds.zw, level).r;
             float depth10 = texelFetch(_flw_depthPyramid, bounds.zy, level).r;
             float depth00 = texelFetch(_flw_depthPyramid, bounds.xy, level).r;
 
-            float depth;
-            if (_flw_cullData.useMin == 0) {
-                depth = max(max(depth00, depth01), max(depth10, depth11));
-            } else {
-                depth = min(min(depth00, depth01), min(depth10, depth11));
-            }
+            float depth = max(max(depth00, depth01), max(depth10, depth11));
 
             float depthSphere = 1. + _flw_cullData.znear / (center.z + radius);
 
