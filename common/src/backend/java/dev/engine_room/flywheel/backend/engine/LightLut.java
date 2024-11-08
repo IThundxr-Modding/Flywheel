@@ -1,30 +1,32 @@
 package dev.engine_room.flywheel.backend.engine;
 
-import org.jetbrains.annotations.NotNull;
+import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntObjectImmutablePair;
-import it.unimi.dsi.fastutil.ints.IntObjectPair;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.longs.LongComparator;
-import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.minecraft.core.SectionPos;
 
 public final class LightLut {
-	private static final LongComparator SECTION_X_THEN_Y_THEN_Z = (long a, long b) -> {
-		final var xComp = Integer.compare(SectionPos.x(a), SectionPos.x(b));
-		if (xComp != 0) {
-			return xComp;
-		}
-		var yComp = Integer.compare(SectionPos.y(a), SectionPos.y(b));
-		if (yComp != 0) {
-			return yComp;
-		}
-		return Integer.compare(SectionPos.z(a), SectionPos.z(b));
-	};
+	private final Layer<Layer<IntLayer>> indices = new Layer<>();
 
 	private LightLut() {
+	}
+
+	private void add(long position, int index) {
+		final var x = SectionPos.x(position);
+		final var y = SectionPos.y(position);
+		final var z = SectionPos.z(position);
+
+		indices.computeIfAbsent(x, Layer::new)
+				.computeIfAbsent(y, IntLayer::new)
+				.set(z, index + 1);
+	}
+
+	private IntArrayList toLut() {
+		final var out = new IntArrayList();
+		indices.fillLut(out, (yIndices, lut) -> yIndices.fillLut(lut, IntLayer::fillLut));
+		return out;
 	}
 
 	// Massive kudos to RogueLogix for figuring out this LUT scheme.
@@ -38,105 +40,135 @@ public final class LightLut {
 		if (sectionIndicesMaps.isEmpty()) {
 			return new IntArrayList();
 		}
-		final var positions = sortedKeys(sectionIndicesMaps);
-		final var baseX = SectionPos.x(positions.getLong(0));
 
-		return buildLut(baseX, buildIndices(sectionIndicesMaps, positions, baseX));
+		var out = new LightLut();
+
+		sectionIndicesMaps.forEach(out::add);
+
+		return out.toLut();
 	}
 
-	private static ReferenceArrayList<IntObjectPair<ReferenceArrayList<IntArrayList>>> buildIndices(Long2IntMap sectionIndicesMaps, LongArrayList positions, int baseX) {
-		final var indices = new ReferenceArrayList<IntObjectPair<ReferenceArrayList<IntArrayList>>>();
-		for (long position : positions) {
-			final var x = SectionPos.x(position);
-			final var y = SectionPos.y(position);
-			final var z = SectionPos.z(position);
+	private static final class Layer<T> {
+		private boolean hasBase = false;
+		private int base = 0;
+		private Object[] nextLayer = new Object[0];
 
-			final var xIndex = x - baseX;
-			if (indices.size() <= xIndex) {
-				indices.ensureCapacity(xIndex + 1);
-				indices.size(xIndex + 1);
-			}
-			var yLookup = indices.get(xIndex);
-			if (yLookup == null) {
-				//noinspection SuspiciousNameCombination
-				yLookup = new IntObjectImmutablePair<>(y, new ReferenceArrayList<>());
-				indices.set(xIndex, yLookup);
-			}
+		public void fillLut(IntArrayList lut, BiConsumer<T, IntArrayList> inner) {
+			lut.add(base);
+			lut.add(nextLayer.length);
 
-			final var yIndices = yLookup.right();
-			final var yIndex = y - yLookup.leftInt();
-			if (yIndices.size() <= yIndex) {
-				yIndices.ensureCapacity(yIndex + 1);
-				yIndices.size(yIndex + 1);
-			}
-			var zLookup = yIndices.get(yIndex);
-			if (zLookup == null) {
-				zLookup = new IntArrayList();
-				zLookup.add(z);
-				zLookup.add(0); // this value will be filled in later
-				yIndices.set(yIndex, zLookup);
-			}
+			int innerIndexBase = lut.size();
 
-			final var zIndex = z - zLookup.getInt(0);
-			if ((zLookup.size() - 2) <= zIndex) {
-				zLookup.ensureCapacity(zIndex + 3);
-				zLookup.size(zIndex + 3);
-			}
-			// Add 1 to the actual index so that 0 indicates a missing section.
-			zLookup.set(zIndex + 2, sectionIndicesMaps.get(position) + 1);
-		}
-		return indices;
-	}
+			// Reserve space for the inner indices...
+			lut.size(innerIndexBase + nextLayer.length);
 
-	private static @NotNull LongArrayList sortedKeys(Long2IntMap sectionIndicesMaps) {
-		final var out = new LongArrayList(sectionIndicesMaps.keySet());
-		out.unstableSort(SECTION_X_THEN_Y_THEN_Z);
-		return out;
-	}
-
-	private static IntArrayList buildLut(int baseX, ReferenceArrayList<IntObjectPair<ReferenceArrayList<IntArrayList>>> indices) {
-		final var out = new IntArrayList();
-		out.add(baseX);
-		out.add(indices.size());
-		for (int i = 0; i < indices.size(); i++) {
-			out.add(0);
-		}
-		for (int x = 0; x < indices.size(); x++) {
-			final var yLookup = indices.get(x);
-			if (yLookup == null) {
-				out.set(x + 2, 0);
-				continue;
-			}
-			// ensure that the base position and size dont cross a (64 byte) cache line
-			if ((out.size() & 0xF) == 0xF) {
-				out.add(0);
-			}
-
-			final var baseYIndex = out.size();
-			out.set(x + 2, baseYIndex);
-
-			final var yIndices = yLookup.right();
-			out.add(yLookup.leftInt());
-			out.add(yIndices.size());
-			for (int i = 0; i < indices.size(); i++) {
-				out.add(0);
-			}
-
-			for (int y = 0; y < yIndices.size(); y++) {
-				final var zLookup = yIndices.get(y);
-				if (zLookup == null) {
-					out.set(baseYIndex + y + 2, 0);
+			for (int i = 0; i < nextLayer.length; i++) {
+				final var innerIndices = (T) nextLayer[i];
+				if (innerIndices == null) {
 					continue;
 				}
-				// ensure that the base position and size dont cross a (64 byte) cache line
-				if ((out.size() & 0xF) == 0xF) {
-					out.add(0);
-				}
-				out.set(baseYIndex + y + 2, out.size());
-				zLookup.set(1, zLookup.size() - 2);
-				out.addAll(zLookup);
+
+				int layerPosition = lut.size();
+
+				// ...so we can write in their actual positions later.
+				lut.set(innerIndexBase + i, layerPosition);
+
+				// Append the next layer to the lut.
+				inner.accept(innerIndices, lut);
 			}
 		}
-		return out;
+
+		public T computeIfAbsent(int i, Supplier<T> ifAbsent) {
+			if (!hasBase) {
+				// We don't want to default to base 0, so we'll use the first value we get.
+				base = i;
+				hasBase = true;
+			}
+
+			if (i < base) {
+				rebase(i);
+			}
+
+			final var offset = i - base;
+
+			if (offset >= nextLayer.length) {
+				resize(offset + 1);
+			}
+
+			var out = nextLayer[offset];
+
+			if (out == null) {
+				out = ifAbsent.get();
+				nextLayer[offset] = out;
+			}
+			return (T) out;
+		}
+
+		private void resize(int length) {
+			final var newIndices = new Object[length];
+			System.arraycopy(nextLayer, 0, newIndices, 0, nextLayer.length);
+			nextLayer = newIndices;
+		}
+
+		private void rebase(int newBase) {
+			final var growth = base - newBase;
+
+			final var newIndices = new Object[nextLayer.length + growth];
+			// Shift the existing elements to the end of the new array to maintain their offset with the new base.
+			System.arraycopy(nextLayer, 0, newIndices, growth, nextLayer.length);
+
+			nextLayer = newIndices;
+			base = newBase;
+		}
+	}
+
+	private static final class IntLayer {
+		private boolean hasBase = false;
+		private int base = 0;
+		private int[] indices = new int[0];
+
+		public void fillLut(IntArrayList lut) {
+			lut.add(base);
+			lut.add(indices.length);
+
+			for (int index : indices) {
+				lut.add(index);
+			}
+		}
+
+		public void set(int i, int index) {
+			if (!hasBase) {
+				base = i;
+				hasBase = true;
+			}
+
+			if (i < base) {
+				rebase(i);
+			}
+
+			final var offset = i - base;
+
+			if (offset >= indices.length) {
+				resize(offset + 1);
+			}
+
+			indices[offset] = index;
+		}
+
+		private void resize(int length) {
+			final var newIndices = new int[length];
+			System.arraycopy(indices, 0, newIndices, 0, indices.length);
+			indices = newIndices;
+		}
+
+		private void rebase(int newBase) {
+			final var growth = base - newBase;
+
+			final var newIndices = new int[indices.length + growth];
+			System.arraycopy(indices, 0, newIndices, growth, indices.length);
+
+			indices = newIndices;
+			base = newBase;
+		}
 	}
 }
