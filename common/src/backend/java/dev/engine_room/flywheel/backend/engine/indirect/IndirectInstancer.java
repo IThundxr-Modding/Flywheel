@@ -156,6 +156,27 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 		public InstanceHandleImpl.State<I> setDeleted(int index) {
 			int localIndex = index % ObjectStorage.PAGE_SIZE;
 
+			clear(localIndex);
+
+			return InstanceHandleImpl.Deleted.instance();
+		}
+
+		@Override
+		public InstanceHandleImpl.State<I> setVisible(InstanceHandleImpl<I> handle, int index, boolean visible) {
+			if (visible) {
+				return this;
+			}
+
+			int localIndex = index % ObjectStorage.PAGE_SIZE;
+
+			var out = instances[localIndex];
+
+			clear(localIndex);
+
+			return new InstanceHandleImpl.Hidden<>(parent.recreate, out);
+		}
+
+		private void clear(int localIndex) {
 			instances[localIndex] = null;
 			handles[localIndex] = null;
 
@@ -174,20 +195,9 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 					}
 					// Set full page last so that other threads don't race to set the other bitsets.
 					parent.fullPages.clear(pageNo);
-					return InstanceHandleImpl.Deleted.instance();
+					break;
 				}
 			}
-		}
-
-		@Override
-		public InstanceHandleImpl.State<I> setVisible(InstanceHandleImpl<I> handle, int index, boolean visible) {
-			if (visible) {
-				return this;
-			}
-
-			int localIndex = index % ObjectStorage.PAGE_SIZE;
-
-			return new InstanceHandleImpl.Hidden<>(parent.recreate, instances[localIndex]);
 		}
 
 		/**
