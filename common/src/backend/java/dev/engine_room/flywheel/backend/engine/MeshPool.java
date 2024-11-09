@@ -70,22 +70,16 @@ public class MeshPool {
 		if (anyToRemove) {
 			anyToRemove = false;
 			processDeletions();
+		}
 
-			// Might want to shrink the index pool if something was removed.
-			indexPool.reset();
-			for (PooledMesh mesh : meshList) {
-				indexPool.updateCount(mesh.mesh.indexSequence(), mesh.indexCount());
-			}
-		} else {
+		if (!recentlyAllocated.isEmpty()) {
 			// Otherwise, just update the index with the new counts.
 			for (PooledMesh mesh : recentlyAllocated) {
 				indexPool.updateCount(mesh.mesh.indexSequence(), mesh.indexCount());
 			}
+			indexPool.flush();
 			recentlyAllocated.clear();
 		}
-
-		// Always need to flush the index pool.
-		indexPool.flush();
 
 		uploadAll();
         dirty = false;
