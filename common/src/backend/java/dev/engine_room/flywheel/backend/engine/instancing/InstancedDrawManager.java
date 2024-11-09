@@ -147,7 +147,15 @@ public class InstancedDrawManager extends DrawManager<InstancedInstancer<?>> {
 	@Override
 	public void renderCrumbling(List<Engine.CrumblingBlock> crumblingBlocks) {
 		// Sort draw calls into buckets, so we don't have to do as many shader binds.
-		var byType = doCrumblingSort(InstancedInstancer.class, crumblingBlocks);
+		var byType = doCrumblingSort(crumblingBlocks, handle -> {
+			// AbstractInstancer directly implement HandleState, so this check is valid.
+			if (handle instanceof InstancedInstancer<?> instancer) {
+				return instancer;
+			}
+			// This rejects instances that were created by a different engine,
+			// and also instances that are hidden or deleted.
+			return null;
+		});
 
 		if (byType.isEmpty()) {
 			return;

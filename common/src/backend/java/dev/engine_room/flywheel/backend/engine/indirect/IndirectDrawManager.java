@@ -189,7 +189,7 @@ public class IndirectDrawManager extends DrawManager<IndirectInstancer<?>> {
 	}
 
 	public void renderCrumbling(List<Engine.CrumblingBlock> crumblingBlocks) {
-		var byType = doCrumblingSort(IndirectInstancer.class, crumblingBlocks);
+		var byType = doCrumblingSort(crumblingBlocks, IndirectInstancer::fromState);
 
 		if (byType.isEmpty()) {
 			return;

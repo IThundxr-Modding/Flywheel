@@ -74,6 +74,14 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 		return new InstanceHandleImpl[ObjectStorage.PAGE_SIZE];
 	}
 
+	@Nullable
+	public static IndirectInstancer<?> fromState(InstanceHandleImpl.State<?> handle) {
+		if (handle instanceof InstancePage<?> instancer) {
+			return instancer.parent;
+		}
+		return null;
+	}
+
 	private static final class InstancePage<I extends Instance> implements InstanceHandleImpl.State<I> {
 		private final IndirectInstancer<I> parent;
 		private final int pageNo;

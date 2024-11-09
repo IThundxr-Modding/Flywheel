@@ -8,6 +8,8 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import org.jetbrains.annotations.Nullable;
+
 import com.mojang.datafixers.util.Pair;
 
 import dev.engine_room.flywheel.api.RenderContext;
@@ -106,7 +108,13 @@ public abstract class DrawManager<N extends AbstractInstancer<?>> {
 		return false;
 	}
 
-	protected static <I extends AbstractInstancer<?>> Map<GroupKey<?>, Int2ObjectMap<List<Pair<I, InstanceHandleImpl<?>>>>> doCrumblingSort(Class<I> clazz, List<Engine.CrumblingBlock> crumblingBlocks) {
+	@FunctionalInterface
+	protected interface State2Instancer<I extends AbstractInstancer<?>> {
+		// I tried using a plain Function<State<?>, I> here, but it exploded with type errors.
+		@Nullable I apply(InstanceHandleImpl.State<?> state);
+	}
+
+	protected static <I extends AbstractInstancer<?>> Map<GroupKey<?>, Int2ObjectMap<List<Pair<I, InstanceHandleImpl<?>>>>> doCrumblingSort(List<Engine.CrumblingBlock> crumblingBlocks, State2Instancer<I> cast) {
 		Map<GroupKey<?>, Int2ObjectMap<List<Pair<I, InstanceHandleImpl<?>>>>> byType = new HashMap<>();
 		for (Engine.CrumblingBlock block : crumblingBlocks) {
 			int progress = block.progress();
@@ -123,15 +131,11 @@ public abstract class DrawManager<N extends AbstractInstancer<?>> {
 					continue;
 				}
 
-				InstanceHandleImpl.State<?> abstractInstancer = impl.state;
-				// AbstractInstancer directly implement HandleState, so this check is valid.
-				if (!clazz.isInstance(abstractInstancer)) {
-					// This rejects instances that were created by a different engine,
-					// and also instances that are hidden or deleted.
+				var instancer = cast.apply(impl.state);
+
+				if (instancer == null) {
 					continue;
 				}
-
-				var instancer = clazz.cast(abstractInstancer);
 
 				byType.computeIfAbsent(new GroupKey<>(instancer.type, instancer.environment), $ -> new Int2ObjectArrayMap<>())
 						.computeIfAbsent(progress, $ -> new ArrayList<>())
