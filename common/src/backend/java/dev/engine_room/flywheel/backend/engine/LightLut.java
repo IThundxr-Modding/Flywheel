@@ -9,6 +9,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.SectionPos;
 
 // Massive kudos to RogueLogix for figuring out this LUT scheme.
+// First layer is Y, then X, then Z.
 public final class LightLut {
 	private final Layer<Layer<IntLayer>> indices = new Layer<>();
 
@@ -17,8 +18,8 @@ public final class LightLut {
 		final var y = SectionPos.y(position);
 		final var z = SectionPos.z(position);
 
-		indices.computeIfAbsent(x, Layer::new)
-				.computeIfAbsent(y, IntLayer::new)
+		indices.computeIfAbsent(y, Layer::new)
+				.computeIfAbsent(x, IntLayer::new)
 				.set(z, index + 1);
 	}
 
@@ -27,13 +28,13 @@ public final class LightLut {
 		final var y = SectionPos.y(section);
 		final var z = SectionPos.z(section);
 
-		var first = indices.get(x);
+		var first = indices.get(y);
 
 		if (first == null) {
 			return;
 		}
 
-		var second = first.get(y);
+		var second = first.get(x);
 
 		if (second == null) {
 			return;
