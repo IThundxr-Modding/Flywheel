@@ -3,17 +3,16 @@ package dev.engine_room.flywheel.backend.engine;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
+import org.jetbrains.annotations.Nullable;
+
 import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import net.minecraft.core.SectionPos;
 
+// Massive kudos to RogueLogix for figuring out this LUT scheme.
 public final class LightLut {
 	private final Layer<Layer<IntLayer>> indices = new Layer<>();
 
-	private LightLut() {
-	}
-
-	private void add(long position, int index) {
+	public void add(long position, int index) {
 		final var x = SectionPos.x(position);
 		final var y = SectionPos.y(position);
 		final var z = SectionPos.z(position);
@@ -23,29 +22,30 @@ public final class LightLut {
 				.set(z, index + 1);
 	}
 
-	private IntArrayList toLut() {
+	public void remove(long section) {
+		final var x = SectionPos.x(section);
+		final var y = SectionPos.y(section);
+		final var z = SectionPos.z(section);
+
+		var first = indices.get(x);
+
+		if (first == null) {
+			return;
+		}
+
+		var second = first.get(y);
+
+		if (second == null) {
+			return;
+		}
+
+		second.clear(z);
+	}
+
+	public IntArrayList flatten() {
 		final var out = new IntArrayList();
 		indices.fillLut(out, (yIndices, lut) -> yIndices.fillLut(lut, IntLayer::fillLut));
 		return out;
-	}
-
-	// Massive kudos to RogueLogix for figuring out this LUT scheme.
-	// TODO: switch to y x z or x z y ordering
-	// DATA LAYOUT
-	// [0] : base chunk X, X index count, followed by linear indices of y blocks
-	// [yBlockIndex] : baseChunk Y, Y index count, followed by linear indices of z blocks for this x
-	// [zBlockIndex] : baseChunk Z, Z index count, followed by linear indices of lighting chunks
-	// this data layout allows a single buffer to represent the lighting volume, without requiring the entire 3d lookup volume to be allocated
-	public static IntArrayList buildLut(Long2IntMap sectionIndicesMaps) {
-		if (sectionIndicesMaps.isEmpty()) {
-			return new IntArrayList();
-		}
-
-		var out = new LightLut();
-
-		sectionIndicesMaps.forEach(out::add);
-
-		return out.toLut();
 	}
 
 	private static final class Layer<T> {
@@ -76,6 +76,25 @@ public final class LightLut {
 				// Append the next layer to the lut.
 				inner.accept(innerIndices, lut);
 			}
+		}
+
+		@Nullable
+		public T get(int i) {
+			if (!hasBase) {
+				return null;
+			}
+
+			if (i < base) {
+				return null;
+			}
+
+			final var offset = i - base;
+
+			if (offset >= nextLayer.length) {
+				return null;
+			}
+
+			return (T) nextLayer[offset];
 		}
 
 		public T computeIfAbsent(int i, Supplier<T> ifAbsent) {
@@ -153,6 +172,24 @@ public final class LightLut {
 			}
 
 			indices[offset] = index;
+		}
+
+		public void clear(int i) {
+			if (!hasBase) {
+				return;
+			}
+
+			if (i < base) {
+				return;
+			}
+
+			final var offset = i - base;
+
+			if (offset >= indices.length) {
+				return;
+			}
+
+			indices[offset] = 0;
 		}
 
 		private void resize(int length) {
