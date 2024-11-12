@@ -80,6 +80,7 @@ public final class LineModelBuilder {
 
 	public Model build() {
 		vertexView.vertexCount(vertexCount);
+		vertexView.nativeMemoryOwner(data);
 
 		var boundingSphere = ModelUtil.computeBoundingSphere(vertexView);
 		boundingSphere.w += 0.1f; // make the bounding sphere a little bigger to account for line width
@@ -137,7 +138,7 @@ public final class LineModelBuilder {
 
 		@Override
 		public void write(MutableVertexList vertexList) {
-			vertexList.writeAll(vertexList);
+			this.vertexList.writeAll(vertexList);
 		}
 
 		@Override
