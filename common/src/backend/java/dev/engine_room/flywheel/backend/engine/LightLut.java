@@ -11,7 +11,7 @@ import net.minecraft.core.SectionPos;
 // Massive kudos to RogueLogix for figuring out this LUT scheme.
 // First layer is Y, then X, then Z.
 public final class LightLut {
-	private final Layer<Layer<IntLayer>> indices = new Layer<>();
+	public final Layer<Layer<IntLayer>> indices = new Layer<>();
 
 	public void add(long position, int index) {
 		final var x = SectionPos.x(position);
@@ -49,7 +49,7 @@ public final class LightLut {
 		return out;
 	}
 
-	private static final class Layer<T> {
+	public static final class Layer<T> {
 		private boolean hasBase = false;
 		private int base = 0;
 		private Object[] nextLayer = new Object[0];
@@ -79,23 +79,34 @@ public final class LightLut {
 			}
 		}
 
+		public int base() {
+			return base;
+		}
+
+		public int size() {
+			return nextLayer.length;
+		}
+
+		@Nullable
+		public T getRaw(int i) {
+			if (i < 0) {
+				return null;
+			}
+
+			if (i >= nextLayer.length) {
+				return null;
+			}
+
+			return (T) nextLayer[i];
+		}
+
 		@Nullable
 		public T get(int i) {
 			if (!hasBase) {
 				return null;
 			}
 
-			if (i < base) {
-				return null;
-			}
-
-			final var offset = i - base;
-
-			if (offset >= nextLayer.length) {
-				return null;
-			}
-
-			return (T) nextLayer[offset];
+			return getRaw(i - base);
 		}
 
 		public T computeIfAbsent(int i, Supplier<T> ifAbsent) {
@@ -142,7 +153,7 @@ public final class LightLut {
 		}
 	}
 
-	private static final class IntLayer {
+	public static final class IntLayer {
 		private boolean hasBase = false;
 		private int base = 0;
 		private int[] indices = new int[0];
@@ -154,6 +165,34 @@ public final class LightLut {
 			for (int index : indices) {
 				lut.add(index);
 			}
+		}
+
+		public int base() {
+			return base;
+		}
+
+		public int size() {
+			return indices.length;
+		}
+
+		public int getRaw(int i) {
+			if (i < 0) {
+				return 0;
+			}
+
+			if (i >= indices.length) {
+				return 0;
+			}
+
+			return indices[i];
+		}
+
+		public int get(int i) {
+			if (!hasBase) {
+				return 0;
+			}
+
+			return getRaw(i - base);
 		}
 
 		public void set(int i, int index) {

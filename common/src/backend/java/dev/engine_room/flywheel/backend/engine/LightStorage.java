@@ -6,15 +6,25 @@ import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
 
 import dev.engine_room.flywheel.api.task.Plan;
+import dev.engine_room.flywheel.api.visual.Effect;
+import dev.engine_room.flywheel.api.visual.EffectVisual;
+import dev.engine_room.flywheel.api.visualization.VisualizationContext;
+import dev.engine_room.flywheel.api.visualization.VisualizationManager;
 import dev.engine_room.flywheel.backend.engine.indirect.StagingBuffer;
 import dev.engine_room.flywheel.backend.gl.buffer.GlBuffer;
+import dev.engine_room.flywheel.lib.instance.InstanceTypes;
+import dev.engine_room.flywheel.lib.instance.TransformedInstance;
 import dev.engine_room.flywheel.lib.math.MoreMath;
 import dev.engine_room.flywheel.lib.task.SimplePlan;
+import dev.engine_room.flywheel.lib.visual.SimpleDynamicVisual;
+import dev.engine_room.flywheel.lib.visual.component.HitboxComponent;
+import dev.engine_room.flywheel.lib.visual.util.InstanceRecycler;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.LevelAccessor;
@@ -35,7 +45,9 @@ import net.minecraft.world.level.lighting.LayerLightEventListener;
  *
  * <p>Thus, each section occupies 5832 bytes.
  */
-public class LightStorage {
+public class LightStorage implements Effect {
+	public static boolean DEBUG = false;
+
 	public static final int BLOCKS_PER_SECTION = 18 * 18 * 18;
 	public static final int LIGHT_SIZE_BYTES = BLOCKS_PER_SECTION;
 	public static final int SOLID_SIZE_BYTES = MoreMath.ceilingDiv(BLOCKS_PER_SECTION, Integer.SIZE) * Integer.BYTES;
@@ -50,6 +62,7 @@ public class LightStorage {
 
 	private final BitSet changed = new BitSet();
 	private boolean needsLutRebuild = false;
+	private boolean isDebugOn = false;
 
 	private final LongSet updatedSections = new LongOpenHashSet();
 	@Nullable
@@ -61,6 +74,16 @@ public class LightStorage {
 		arena = new CpuArena(SECTION_SIZE_BYTES, DEFAULT_ARENA_CAPACITY_SECTIONS);
 		section2ArenaIndex = new Long2IntOpenHashMap();
 		section2ArenaIndex.defaultReturnValue(INVALID_SECTION);
+	}
+
+	@Override
+	public LevelAccessor level() {
+		return level;
+	}
+
+	@Override
+	public EffectVisual<?> visualize(VisualizationContext ctx, float partialTick) {
+		return new DebugVisual(ctx, partialTick);
 	}
 
 	/**
@@ -79,6 +102,22 @@ public class LightStorage {
 
 	public <C> Plan<C> createFramePlan() {
 		return SimplePlan.of(() -> {
+			if (DEBUG != isDebugOn) {
+				var visualizationManager = VisualizationManager.get(level);
+
+				// Really should be non-null, but just in case.
+				if (visualizationManager != null) {
+					if (DEBUG) {
+						visualizationManager.effects()
+								.queueAdd(this);
+					} else {
+						visualizationManager.effects()
+								.queueRemove(this);
+					}
+				}
+				isDebugOn = DEBUG;
+			}
+
 			if (updatedSections.isEmpty() && requestedSections == null) {
 				return;
 			}
@@ -440,6 +479,132 @@ public class LightStorage {
 			this.pos = pos;
 			this.relative = relative;
 			this.sectionOffset = sectionOffset;
+		}
+	}
+
+	public class DebugVisual implements EffectVisual<LightStorage>, SimpleDynamicVisual {
+
+		private final InstanceRecycler<TransformedInstance> boxes;
+
+		public DebugVisual(VisualizationContext ctx, float partialTick) {
+			boxes = new InstanceRecycler<>(() -> ctx.instancerProvider()
+					.instancer(InstanceTypes.TRANSFORMED, HitboxComponent.BOX_MODEL)
+					.createInstance());
+		}
+
+		@Override
+		public void beginFrame(Context ctx) {
+			boxes.resetCount();
+
+			setupSectionBoxes();
+			setupLutRangeBoxes();
+
+			boxes.discardExtra();
+		}
+
+		private void setupSectionBoxes() {
+			section2ArenaIndex.keySet()
+					.forEach(l -> {
+						var x = SectionPos.x(l);
+						var y = SectionPos.y(l);
+						var z = SectionPos.z(l);
+
+						var instance = boxes.get();
+
+						instance.setIdentityTransform()
+								.scale(16)
+								.translate(x, y, z)
+								.color(255, 255, 0)
+								.light(LightTexture.FULL_BRIGHT)
+								.setChanged();
+					});
+		}
+
+		private void setupLutRangeBoxes() {
+			var first = lut.indices;
+
+			var base1 = first.base();
+			var size1 = first.size();
+
+			for (int y = 0; y < size1; y++) {
+				var second = first.getRaw(y);
+
+				if (second == null) {
+					continue;
+				}
+
+				var base2 = second.base();
+				var size2 = second.size();
+
+				for (int x = 0; x < size2; x++) {
+					var third = second.getRaw(x);
+
+					if (third == null) {
+						continue;
+					}
+
+					var base3 = third.base();
+					var size3 = third.size();
+
+					for (int z = 0; z < size3; z++) {
+						float x1 = base2 * 16;
+						float y1 = base1 * 16;
+						float z1 = base3 * 16;
+
+						float x2 = (base2 + x) * 16 + 7.5f;
+						float y2 = (base1 + y) * 16 + 7.5f;
+						float z2 = (base3 + z) * 16 + 7.5f;
+						boxes.get()
+								.setIdentityTransform()
+								.translate(x1, y2, z2)
+								.scale(size2 * 16, 1, 1)
+								.color(255, 0, 0)
+								.light(LightTexture.FULL_BRIGHT)
+								.setChanged();
+
+						boxes.get()
+								.setIdentityTransform()
+								.translate(x2, y1, z2)
+								.scale(1, size1 * 16, 1)
+								.color(0, 255, 0)
+								.light(LightTexture.FULL_BRIGHT)
+								.setChanged();
+
+						boxes.get()
+								.setIdentityTransform()
+								.translate(x2, y2, z1)
+								.scale(1, 1, size3 * 16)
+								.color(0, 0, 255)
+								.light(LightTexture.FULL_BRIGHT)
+								.setChanged();
+
+						if (third.getRaw(z) == 0) {
+							float x3 = (base2 + x) * 16 + 6f;
+							float y3 = (base1 + y) * 16 + 6f;
+							float z3 = (base3 + z) * 16 + 6f;
+
+							// Freely representable section that is not filled.
+							boxes.get()
+									.setIdentityTransform()
+									.translate(x3, y3, z3)
+									.scale(4)
+									.color(0, 255, 255)
+									.light(LightTexture.FULL_BRIGHT)
+									.setChanged();
+						}
+					}
+				}
+			}
+		}
+
+		@Override
+		public void update(float partialTick) {
+
+		}
+
+		@Override
+		public void delete() {
+			boxes.delete();
 		}
 	}
 }
