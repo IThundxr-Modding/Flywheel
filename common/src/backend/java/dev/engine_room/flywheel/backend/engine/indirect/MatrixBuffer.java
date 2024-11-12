@@ -30,4 +30,8 @@ public class MatrixBuffer {
 
 		GL46.glBindBufferRange(GL46.GL_SHADER_STORAGE_BUFFER, BufferBindings.MATRICES, matrices.handle(), 0, matrices.byteCapacity());
 	}
+
+	public void delete() {
+		matrices.delete();
+	}
 }

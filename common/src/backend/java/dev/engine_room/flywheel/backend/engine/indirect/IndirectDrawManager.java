@@ -186,6 +186,10 @@ public class IndirectDrawManager extends DrawManager<IndirectInstancer<?>> {
 		programs.release();
 
 		depthPyramid.delete();
+
+		lightBuffers.delete();
+
+		matrixBuffer.delete();
 	}
 
 	public void renderCrumbling(List<Engine.CrumblingBlock> crumblingBlocks) {

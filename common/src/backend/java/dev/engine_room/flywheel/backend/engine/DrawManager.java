@@ -28,6 +28,8 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.client.resources.model.ModelBakery;
 
 public abstract class DrawManager<N extends AbstractInstancer<?>> {
+	private static final boolean WARN_EMPTY_MODELS = Boolean.getBoolean("flywheel.warnEmptyModels");
+
 	/**
 	 * A map of instancer keys to instancers.
 	 * <br>
@@ -100,15 +102,16 @@ public abstract class DrawManager<N extends AbstractInstancer<?>> {
 			return true;
 		}
 
-		StringBuilder builder = new StringBuilder();
-		builder.append("Creating an instancer for a model with no meshes! Stack trace:");
+		if (WARN_EMPTY_MODELS) {
+			StringBuilder builder = new StringBuilder();
+			builder.append("Creating an instancer for a model with no meshes! Stack trace:");
 
-		StackWalker.getInstance()
-				// .walk(s -> s.skip(3)) // this causes forEach to crash for some reason
-				.forEach(f -> builder.append("\n\t")
-						.append(f.toString()));
+			StackWalker.getInstance()
+					.forEach(f -> builder.append("\n\t")
+							.append(f.toString()));
 
-		FlwBackend.LOGGER.warn(builder.toString());
+			FlwBackend.LOGGER.warn(builder.toString());
+		}
 
 		return false;
 	}
