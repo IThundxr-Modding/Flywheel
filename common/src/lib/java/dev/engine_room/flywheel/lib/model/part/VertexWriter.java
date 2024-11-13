@@ -84,7 +84,7 @@ class VertexWriter implements VertexConsumer {
 	}
 
 	private long vertexPtr() {
-		return data.ptr() + vertexCount * STRIDE;
+		return data.ptr() + (vertexCount - 1) * STRIDE;
 	}
 
 	private void endLastVertex() {

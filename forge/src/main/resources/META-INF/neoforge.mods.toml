@@ -1,5 +1,5 @@
 modLoader = "javafml"
-# The loader version doesn't matter. Modify the Forge and/or Minecraft version ranges instead.
+# The loader version doesn't matter. Modify the NeoForge and/or Minecraft version ranges instead.
 loaderVersion = "[0,)"
 license = "${mod_license}"
 issueTrackerURL = "${mod_issues}"
