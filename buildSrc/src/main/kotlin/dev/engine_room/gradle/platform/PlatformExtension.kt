@@ -2,17 +2,17 @@ package dev.engine_room.gradle.platform
 
 import dev.engine_room.gradle.jarset.JarTaskSet
 import net.fabricmc.loom.api.LoomGradleExtensionAPI
+import net.fabricmc.loom.task.RemapJarTask
 import org.gradle.api.Project
+import org.gradle.api.Task
 import org.gradle.api.tasks.SourceSet
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.javadoc.Javadoc
 import org.gradle.jvm.tasks.Jar
-import org.gradle.kotlin.dsl.named
-import org.gradle.kotlin.dsl.provideDelegate
-import org.gradle.kotlin.dsl.the
-import org.gradle.kotlin.dsl.withType
+import org.gradle.kotlin.dsl.*
 import org.gradle.language.jvm.tasks.ProcessResources
+import java.io.File
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
@@ -98,6 +98,29 @@ open class PlatformExtension(val project: Project) {
                 extraSourceSets.forEach { from(it.allJava) }
 
                 JarTaskSet.excludeDuplicatePackageInfos(this)
+            }
+        }
+    }
+
+    fun setupTestMod(sourceSet: SourceSet) {
+        project.tasks.apply {
+            val testModJar = register<Jar>("testModJar") {
+                from(sourceSet.output)
+                val file = File(project.layout.buildDirectory.asFile.get(), "devlibs");
+                destinationDirectory.set(file)
+                archiveClassifier = "testmod"
+            }
+
+            val remapTestModJar = register<RemapJarTask>("remapTestModJar") {
+                dependsOn(testModJar)
+                inputFile.set(testModJar.get().archiveFile)
+                archiveClassifier = "testmod"
+                addNestedDependencies = false
+                classpath.from(sourceSet.compileClasspath)
+            }
+
+            named<Task>("build").configure {
+                dependsOn(remapTestModJar)
             }
         }
     }

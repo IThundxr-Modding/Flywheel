@@ -22,7 +22,6 @@ import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.lighting.LayerLightEventListener;
 
 /**
- * TODO: AO data
  * A managed arena of light sections for uploading to the GPU.
  *
  * <p>Each section represents an 18x18x18 block volume of light data.
@@ -45,12 +44,9 @@ public class LightStorage {
 	private static final int INVALID_SECTION = -1;
 
 	private final LevelAccessor level;
-
+	private final LightLut lut;
 	private final CpuArena arena;
-	private final Long2IntMap section2ArenaIndex = new Long2IntOpenHashMap();
-	{
-		section2ArenaIndex.defaultReturnValue(INVALID_SECTION);
-	}
+	private final Long2IntMap section2ArenaIndex;
 
 	private final BitSet changed = new BitSet();
 	private boolean needsLutRebuild = false;
@@ -61,8 +57,10 @@ public class LightStorage {
 
 	public LightStorage(LevelAccessor level) {
 		this.level = level;
-
+		lut = new LightLut();
 		arena = new CpuArena(SECTION_SIZE_BYTES, DEFAULT_ARENA_CAPACITY_SECTIONS);
+		section2ArenaIndex = new Long2IntOpenHashMap();
+		section2ArenaIndex.defaultReturnValue(INVALID_SECTION);
 	}
 
 	/**
@@ -116,7 +114,6 @@ public class LightStorage {
 			}
 
 			// Now actually do the collection.
-			// TODO: Should this be done in parallel?
 			sectionsToCollect.forEach(this::collectSection);
 
 			updatedSections.clear();
@@ -137,10 +134,20 @@ public class LightStorage {
 
 			if (!requestedSections.contains(section)) {
 				arena.free(entry.getIntValue());
-				needsLutRebuild = true;
+				endTrackingSection(section);
 				it.remove();
 			}
 		}
+	}
+
+	private void beginTrackingSection(long section, int index) {
+		lut.add(section, index);
+		needsLutRebuild = true;
+	}
+
+	private void endTrackingSection(long section) {
+		lut.remove(section);
+		needsLutRebuild = true;
 	}
 
 	public int capacity() {
@@ -376,7 +383,7 @@ public class LightStorage {
 		if (out == INVALID_SECTION) {
 			out = arena.alloc();
 			section2ArenaIndex.put(section, out);
-			needsLutRebuild = true;
+			beginTrackingSection(section, out);
 		}
 		return out;
 	}
@@ -408,8 +415,7 @@ public class LightStorage {
 	}
 
 	public IntArrayList createLut() {
-		// TODO: incremental lut updates
-		return LightLut.buildLut(section2ArenaIndex);
+		return lut.flatten();
 	}
 
 	private enum SectionEdge {

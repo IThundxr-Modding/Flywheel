@@ -102,19 +102,14 @@ bool _flw_isVisible(uint instanceIndex, uint modelIndex) {
 
             // Clamp to the texture bounds.
             // Since we're not going through a sampler out of bounds texel fetches will return 0.
-            bounds = clamp(bounds, ivec4(0), levelSizePair);
+            bounds = clamp(bounds, ivec4(0), levelSizePair - ivec4(1));
 
             float depth01 = texelFetch(_flw_depthPyramid, bounds.xw, level).r;
             float depth11 = texelFetch(_flw_depthPyramid, bounds.zw, level).r;
             float depth10 = texelFetch(_flw_depthPyramid, bounds.zy, level).r;
             float depth00 = texelFetch(_flw_depthPyramid, bounds.xy, level).r;
 
-            float depth;
-            if (_flw_cullData.useMin == 0) {
-                depth = max(max(depth00, depth01), max(depth10, depth11));
-            } else {
-                depth = min(min(depth00, depth01), min(depth10, depth11));
-            }
+            float depth = max(max(depth00, depth01), max(depth10, depth11));
 
             float depthSphere = 1. + _flw_cullData.znear / (center.z + radius);
 
@@ -126,23 +121,21 @@ bool _flw_isVisible(uint instanceIndex, uint modelIndex) {
 }
 
 void main() {
-    uint pageIndex = gl_WorkGroupID.x;
+    uint pageIndex = gl_WorkGroupID.x << 1u;
 
     if (pageIndex >= _flw_pageFrameDescriptors.length()) {
         return;
     }
 
-    uint packedModelIndexAndCount = _flw_pageFrameDescriptors[pageIndex];
+    uint modelIndex = _flw_pageFrameDescriptors[pageIndex];
 
-    uint pageInstanceCount = packedModelIndexAndCount >> _FLW_PAGE_COUNT_OFFSET;
+    uint pageValidity = _flw_pageFrameDescriptors[pageIndex + 1];
 
-    if (gl_LocalInvocationID.x >= pageInstanceCount) {
+    if (((1u << gl_LocalInvocationID.x) & pageValidity) == 0) {
         return;
     }
 
     uint instanceIndex = gl_GlobalInvocationID.x;
-
-    uint modelIndex = packedModelIndexAndCount & _FLW_MODEL_INDEX_MASK;
 
     if (_flw_isVisible(instanceIndex, modelIndex)) {
         uint localIndex = atomicAdd(_flw_models[modelIndex].instanceCount, 1);

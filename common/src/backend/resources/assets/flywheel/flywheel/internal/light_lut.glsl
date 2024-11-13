@@ -14,6 +14,8 @@ const float _FLW_EPSILON = 1e-5;
 const uint _FLW_LOWER_10_BITS = 0x3FFu;
 const uint _FLW_UPPER_10_BITS = 0xFFF00000u;
 
+const float _FLW_LIGHT_NORMALIZER = 1. / 16.;
+
 uint _flw_indexLut(uint index);
 
 uint _flw_indexLight(uint index);
@@ -43,18 +45,18 @@ bool _flw_nextLut(uint base, int coord, out uint next) {
 }
 
 bool _flw_chunkCoordToSectionIndex(ivec3 sectionPos, out uint index) {
-    uint y;
-    if (_flw_nextLut(0, sectionPos.x, y) || y == 0) {
+    uint first;
+    if (_flw_nextLut(0, sectionPos.y, first) || first == 0) {
         return true;
     }
 
-    uint z;
-    if (_flw_nextLut(y, sectionPos.y, z) || z == 0) {
+    uint second;
+    if (_flw_nextLut(first, sectionPos.x, second) || second == 0) {
         return true;
     }
 
     uint sectionIndex;
-    if (_flw_nextLut(z, sectionPos.z, sectionIndex) || sectionIndex == 0) {
+    if (_flw_nextLut(second, sectionPos.z, sectionIndex) || sectionIndex == 0) {
         return true;
     }
 
@@ -98,7 +100,7 @@ bool flw_lightFetch(ivec3 blockPos, out vec2 lightCoord) {
 
     uvec3 blockInSectionPos = (blockPos & 0xF) + 1;
 
-    lightCoord = vec2(_flw_lightAt(sectionOffset, blockInSectionPos)) / 15.;
+    lightCoord = vec2(_flw_lightAt(sectionOffset, blockInSectionPos)) * _FLW_LIGHT_NORMALIZER;
     return true;
 }
 
@@ -298,7 +300,7 @@ vec3 _flw_lightForDirection(uint[27] lights, vec3 interpolant, uint c00, uint c0
     vec3 light = mix(light0, light1, interpolant.y);
 
     // Normalize the light coords
-    light.xy *= 1. / 15.;
+    light.xy *= _FLW_LIGHT_NORMALIZER;
     // Calculate the AO multiplier from the number of valid blocks
     light.z = _flw_validCountToAo(light.z);
 
@@ -351,7 +353,7 @@ bool flw_light(vec3 worldPos, vec3 normal, out FlwLightAo light) {
     vec2 light0 = mix(light00, light01, interpolant.y);
     vec2 light1 = mix(light10, light11, interpolant.y);
 
-    light.light = mix(light0, light1, interpolant.x) / 15.;
+    light.light = mix(light0, light1, interpolant.x) * _FLW_LIGHT_NORMALIZER;
     light.ao = 1.;
 
     // Lighting and AO accurate to chunk baking
@@ -410,7 +412,7 @@ bool flw_light(vec3 worldPos, vec3 normal, out FlwLightAo light) {
     // Entirely flat lighting, the lowest setting and a fallback in case an invalid option is set
     #else
 
-    light.light = vec2(_flw_lightAt(sectionOffset, blockInSectionPos)) / 15.;
+    light.light = vec2(_flw_lightAt(sectionOffset, blockInSectionPos)) * _FLW_LIGHT_NORMALIZER;
     light.ao = 1.;
 
     #endif

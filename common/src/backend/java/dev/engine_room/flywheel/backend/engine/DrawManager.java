@@ -8,6 +8,8 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import org.jetbrains.annotations.Nullable;
+
 import com.mojang.datafixers.util.Pair;
 
 import dev.engine_room.flywheel.api.RenderContext;
@@ -26,6 +28,8 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.client.resources.model.ModelBakery;
 
 public abstract class DrawManager<N extends AbstractInstancer<?>> {
+	private static final boolean WARN_EMPTY_MODELS = Boolean.getBoolean("flywheel.warnEmptyModels");
+
 	/**
 	 * A map of instancer keys to instancers.
 	 * <br>
@@ -50,14 +54,19 @@ public abstract class DrawManager<N extends AbstractInstancer<?>> {
 
 	public Plan<RenderContext> createFramePlan() {
 		// Go wide on instancers to process deletions in parallel.
-		return ForEachPlan.of(() -> new ArrayList<>(instancers.values()), AbstractInstancer::removeDeletedInstances);
+		return ForEachPlan.of(() -> new ArrayList<>(instancers.values()), AbstractInstancer::parallelUpdate);
 	}
 
 	public void flush(LightStorage lightStorage, EnvironmentStorage environmentStorage) {
 		// Thread safety: flush is called from the render thread after all visual updates have been made,
 		// so there are no:tm: threads we could be racing with.
-		for (var instancer : initializationQueue) {
-			initialize(instancer.key(), instancer.instancer());
+		for (var init : initializationQueue) {
+			var instancer = init.instancer();
+			if (instancer.instanceCount() > 0) {
+				initialize(init.key(), instancer);
+			} else {
+				instancers.remove(init.key());
+			}
 		}
 		initializationQueue.clear();
 	}
@@ -93,20 +102,27 @@ public abstract class DrawManager<N extends AbstractInstancer<?>> {
 			return true;
 		}
 
-		StringBuilder builder = new StringBuilder();
-		builder.append("Creating an instancer for a model with no meshes! Stack trace:");
+		if (WARN_EMPTY_MODELS) {
+			StringBuilder builder = new StringBuilder();
+			builder.append("Creating an instancer for a model with no meshes! Stack trace:");
 
-		StackWalker.getInstance()
-				// .walk(s -> s.skip(3)) // this causes forEach to crash for some reason
-				.forEach(f -> builder.append("\n\t")
-						.append(f.toString()));
+			StackWalker.getInstance()
+					.forEach(f -> builder.append("\n\t")
+							.append(f.toString()));
 
-		FlwBackend.LOGGER.warn(builder.toString());
+			FlwBackend.LOGGER.warn(builder.toString());
+		}
 
 		return false;
 	}
 
-	protected static <I extends AbstractInstancer<?>> Map<GroupKey<?>, Int2ObjectMap<List<Pair<I, InstanceHandleImpl<?>>>>> doCrumblingSort(Class<I> clazz, List<Engine.CrumblingBlock> crumblingBlocks) {
+	@FunctionalInterface
+	protected interface State2Instancer<I extends AbstractInstancer<?>> {
+		// I tried using a plain Function<State<?>, I> here, but it exploded with type errors.
+		@Nullable I apply(InstanceHandleImpl.State<?> state);
+	}
+
+	protected static <I extends AbstractInstancer<?>> Map<GroupKey<?>, Int2ObjectMap<List<Pair<I, InstanceHandleImpl<?>>>>> doCrumblingSort(List<Engine.CrumblingBlock> crumblingBlocks, State2Instancer<I> cast) {
 		Map<GroupKey<?>, Int2ObjectMap<List<Pair<I, InstanceHandleImpl<?>>>>> byType = new HashMap<>();
 		for (Engine.CrumblingBlock block : crumblingBlocks) {
 			int progress = block.progress();
@@ -123,15 +139,11 @@ public abstract class DrawManager<N extends AbstractInstancer<?>> {
 					continue;
 				}
 
-				InstanceHandleImpl.State<?> abstractInstancer = impl.state;
-				// AbstractInstancer directly implement HandleState, so this check is valid.
-				if (!clazz.isInstance(abstractInstancer)) {
-					// This rejects instances that were created by a different engine,
-					// and also instances that are hidden or deleted.
+				var instancer = cast.apply(impl.state);
+
+				if (instancer == null) {
 					continue;
 				}
-
-				var instancer = clazz.cast(abstractInstancer);
 
 				byType.computeIfAbsent(new GroupKey<>(instancer.type, instancer.environment), $ -> new Int2ObjectArrayMap<>())
 						.computeIfAbsent(progress, $ -> new ArrayList<>())

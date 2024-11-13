@@ -43,7 +43,11 @@ public class ShaderLightVisualStorage {
 	}
 
 	public void remove(ShaderLightVisual visual) {
-		trackers.remove(visual);
+		var tracker = trackers.remove(visual);
+
+		if (tracker != null) {
+			markDirty();
+		}
 	}
 
 	public void clear() {
