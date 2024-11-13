@@ -100,17 +100,7 @@ public class FabricFlwConfig implements FlwConfig {
 		readBackend(object);
 		readLimitUpdates(object);
 		readWorkerThreads(object);
-		readFlwBackend(object);
-	}
-
-	private void readFlwBackend(JsonObject object) {
-		var flwBackendJson = object.get("flw_backend");
-
-		if (flwBackendJson instanceof JsonObject flwBackendObject) {
-			backendConfig.fromJson(flwBackendObject);
-		} else {
-			FlwImpl.CONFIG_LOGGER.warn("'flw_backend' value must be an object");
-		}
+		readFlwBackends(object);
 	}
 
 	private void readBackend(JsonObject object) {
@@ -174,6 +164,16 @@ public class FabricFlwConfig implements FlwConfig {
 		workerThreads = WORKER_THREADS_DEFAULT;
 	}
 
+	private void readFlwBackends(JsonObject object) {
+		var flwBackendsJson = object.get("flw_backends");
+
+		if (flwBackendsJson instanceof JsonObject flwBackendsObject) {
+			backendConfig.fromJson(flwBackendsObject);
+		} else {
+			FlwImpl.CONFIG_LOGGER.warn("'flw_backends' value must be an object");
+		}
+	}
+
 	public JsonObject toJson() {
 		JsonObject object = new JsonObject();
 		object.addProperty("backend", Backend.REGISTRY.getIdOrThrow(backend).toString());
@@ -206,10 +206,10 @@ public class FabricFlwConfig implements FlwConfig {
 		}
 
 		private void readLightSmoothness(JsonObject object) {
-			var backendJson = object.get("lightSmoothness");
+			var lightSmoothnessJson = object.get("lightSmoothness");
 			String msg = null;
 
-			if (backendJson instanceof JsonPrimitive primitive && primitive.isString()) {
+			if (lightSmoothnessJson instanceof JsonPrimitive primitive && primitive.isString()) {
 				var value = primitive.getAsString();
 
 				for (var item : LightSmoothness.values()) {
@@ -221,7 +221,7 @@ public class FabricFlwConfig implements FlwConfig {
 				}
 
 				msg = "Unknown 'lightSmoothness' value: " + value;
-			} else if (backendJson != null) {
+			} else if (lightSmoothnessJson != null) {
 				msg = "'lightSmoothness' value must be a string";
 			}
 

@@ -17,8 +17,6 @@ public final class BackendManagerImpl {
 			.supported(() -> true)
 			.register(Flywheel.rl("off"));
 
-	public static final Backend DEFAULT_BACKEND = findDefaultBackend();
-
 	private static Backend backend = OFF_BACKEND;
 
 	private BackendManagerImpl() {
@@ -41,7 +39,7 @@ public final class BackendManagerImpl {
 		return backends;
 	}
 
-	private static Backend findDefaultBackend() {
+	public static Backend defaultBackend() {
 		var backendsByPriority = backendsByPriority();
 		if (backendsByPriority.isEmpty()) {
 			// This probably shouldn't happen, but fail gracefully.
