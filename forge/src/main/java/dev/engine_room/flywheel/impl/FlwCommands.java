@@ -84,7 +84,7 @@ public final class FlwCommands {
 							return Command.SINGLE_SUCCESS;
 						})));
 
-		var lightSmoothnessValue = ForgeFlwConfig.INSTANCE.client.backendConfig.lightSmoothness;
+		var lightSmoothnessValue = NeoForgeFlwConfig.INSTANCE.client.backendConfig.lightSmoothness;
 		command.then(Commands.literal("lightSmoothness")
 				.then(Commands.argument("mode", LightSmoothnessArgument.INSTANCE)
 						.executes(context -> {
@@ -98,7 +98,7 @@ public final class FlwCommands {
 							return Command.SINGLE_SUCCESS;
 						})));
 
-		var useLightDirectionsValue = ForgeFlwConfig.INSTANCE.client.backendConfig.useLightDirections;
+		var useLightDirectionsValue = NeoForgeFlwConfig.INSTANCE.client.backendConfig.useLightDirections;
 		command.then(Commands.literal("useLightDirections")
 				.executes(context -> {
 					if (useLightDirectionsValue.get()) {

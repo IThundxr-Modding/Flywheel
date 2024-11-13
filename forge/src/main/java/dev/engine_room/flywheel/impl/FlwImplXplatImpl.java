@@ -1,7 +1,6 @@
 package dev.engine_room.flywheel.impl;
 
 import dev.engine_room.flywheel.api.event.ReloadLevelRendererEvent;
-import dev.engine_room.flywheel.impl.compat.CompatMod;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.neoforged.fml.loading.LoadingModList;
 import net.neoforged.neoforge.common.NeoForge;
