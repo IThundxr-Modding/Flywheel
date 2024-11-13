@@ -42,7 +42,7 @@ public class FlwApiLinkImpl implements FlwApiLink {
 
 	@Override
 	public Backend getDefaultBackend() {
-		return BackendManagerImpl.DEFAULT_BACKEND;
+		return BackendManagerImpl.defaultBackend();
 	}
 
 	@Override

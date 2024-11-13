@@ -83,7 +83,7 @@ public class ForgeFlwConfig implements FlwConfig {
 
 		private ClientConfig(ForgeConfigSpec.Builder builder) {
 			backend = builder.comment("Select the backend to use.")
-					.define("backend", Backend.REGISTRY.getIdOrThrow(BackendManager.defaultBackend()).toString());
+					.define("backend", () -> Backend.REGISTRY.getIdOrThrow(BackendManager.defaultBackend()).toString(), o -> o != null && String.class.isAssignableFrom(o.getClass()));
 
 			limitUpdates = builder.comment("Enable or disable instance update limiting with distance.")
 					.define("limitUpdates", true);
