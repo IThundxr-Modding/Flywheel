@@ -53,6 +53,7 @@ public class ShulkerBoxVisual extends AbstractBlockEntityVisual<ShulkerBoxBlockE
 		lid = instances.childOrThrow("lid");
 
 		initialPose = createInitialPose();
+		applyTransform(partialTick);
 	}
 
 	private Matrix4f createInitialPose() {
@@ -80,7 +81,11 @@ public class ShulkerBoxVisual extends AbstractBlockEntityVisual<ShulkerBoxBlockE
 			return;
 		}
 
-		float progress = blockEntity.getProgress(context.partialTick());
+		applyTransform(context.partialTick());
+	}
+
+	private void applyTransform(float partialTicks) {
+		float progress = blockEntity.getProgress(partialTicks);
 		if (progress == lastProgress) {
 			return;
 		}

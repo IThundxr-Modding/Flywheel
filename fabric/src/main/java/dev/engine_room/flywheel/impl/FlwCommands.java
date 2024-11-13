@@ -10,6 +10,7 @@ import dev.engine_room.flywheel.api.backend.Backend;
 import dev.engine_room.flywheel.api.backend.BackendManager;
 import dev.engine_room.flywheel.backend.compile.LightSmoothness;
 import dev.engine_room.flywheel.backend.compile.PipelineCompiler;
+import dev.engine_room.flywheel.backend.engine.LightStorage;
 import dev.engine_room.flywheel.backend.engine.uniform.DebugMode;
 import dev.engine_room.flywheel.backend.engine.uniform.FrameUniforms;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
@@ -85,46 +86,6 @@ public final class FlwCommands {
 							return Command.SINGLE_SUCCESS;
 						})));
 
-		command.then(ClientCommandManager.literal("crumbling")
-				.then(ClientCommandManager.argument("pos", BlockPosArgument.blockPos())
-						.then(ClientCommandManager.argument("stage", IntegerArgumentType.integer(0, 9))
-								.executes(context -> {
-									Entity executor = context.getSource()
-											.getEntity();
-
-									if (executor == null) {
-										return 0;
-									}
-
-									BlockPos pos = getBlockPos(context, "pos");
-									int value = IntegerArgumentType.getInteger(context, "stage");
-
-									executor.level()
-											.destroyBlockProgress(executor.getId(), pos, value);
-
-									return Command.SINGLE_SUCCESS;
-								}))));
-
-		command.then(ClientCommandManager.literal("debug")
-				.then(ClientCommandManager.argument("mode", DebugModeArgument.INSTANCE)
-						.executes(context -> {
-							DebugMode mode = context.getArgument("mode", DebugMode.class);
-							FrameUniforms.debugMode(mode);
-							return Command.SINGLE_SUCCESS;
-						})));
-
-		command.then(ClientCommandManager.literal("frustum")
-				.then(ClientCommandManager.literal("capture")
-						.executes(context -> {
-							FrameUniforms.captureFrustum();
-							return Command.SINGLE_SUCCESS;
-						}))
-				.then(ClientCommandManager.literal("unpause")
-						.executes(context -> {
-							FrameUniforms.unpauseFrustum();
-							return Command.SINGLE_SUCCESS;
-						})));
-
 		command.then(ClientCommandManager.literal("lightSmoothness")
 				.then(ClientCommandManager.argument("mode", LightSmoothnessArgument.INSTANCE)
 						.executes(context -> {
@@ -167,7 +128,67 @@ public final class FlwCommands {
 							return Command.SINGLE_SUCCESS;
 						})));
 
+		command.then(createDebugCommand());
+
 		dispatcher.register(command);
+	}
+
+	private static LiteralArgumentBuilder<FabricClientCommandSource> createDebugCommand() {
+		var debug = ClientCommandManager.literal("debug");
+
+		debug.then(ClientCommandManager.literal("crumbling")
+				.then(ClientCommandManager.argument("pos", BlockPosArgument.blockPos())
+						.then(ClientCommandManager.argument("stage", IntegerArgumentType.integer(0, 9))
+								.executes(context -> {
+									Entity executor = context.getSource()
+											.getEntity();
+
+									if (executor == null) {
+										return 0;
+									}
+
+									BlockPos pos = getBlockPos(context, "pos");
+									int value = IntegerArgumentType.getInteger(context, "stage");
+
+									executor.level()
+											.destroyBlockProgress(executor.getId(), pos, value);
+
+									return Command.SINGLE_SUCCESS;
+								}))));
+
+		debug.then(ClientCommandManager.literal("shader")
+				.then(ClientCommandManager.argument("mode", DebugModeArgument.INSTANCE)
+						.executes(context -> {
+							DebugMode mode = context.getArgument("mode", DebugMode.class);
+							FrameUniforms.debugMode(mode);
+							return Command.SINGLE_SUCCESS;
+						})));
+
+		debug.then(ClientCommandManager.literal("frustum")
+				.then(ClientCommandManager.literal("capture")
+						.executes(context -> {
+							FrameUniforms.captureFrustum();
+							return Command.SINGLE_SUCCESS;
+						}))
+				.then(ClientCommandManager.literal("unpause")
+						.executes(context -> {
+							FrameUniforms.unpauseFrustum();
+							return Command.SINGLE_SUCCESS;
+						})));
+
+		debug.then(ClientCommandManager.literal("lightSections")
+				.then(ClientCommandManager.literal("on")
+						.executes(context -> {
+							LightStorage.DEBUG = true;
+							return Command.SINGLE_SUCCESS;
+						}))
+				.then(ClientCommandManager.literal("off")
+						.executes(context -> {
+							LightStorage.DEBUG = false;
+							return Command.SINGLE_SUCCESS;
+						})));
+
+		return debug;
 	}
 
 	// Client version of BlockPosArgument.getBlockPos

@@ -25,7 +25,7 @@ public final class HitboxComponent implements EntityComponent {
 	//  | /      | /
 	//  |/       |/
 	// 001------101
-	private static final Model BOX_MODEL = new LineModelBuilder(12)
+	public static final Model BOX_MODEL = new LineModelBuilder(12)
 			// Starting from 0, 0, 0
 			.line(0, 0, 0, 0, 0, 1)
 			.line(0, 0, 0, 0, 1, 0)
@@ -44,7 +44,7 @@ public final class HitboxComponent implements EntityComponent {
 			.line(1, 1, 0, 0, 1, 0)
 			.build();
 
-	private static final Model LINE_MODEL = new LineModelBuilder(1)
+	public static final Model LINE_MODEL = new LineModelBuilder(1)
 			.line(0, 0, 0, 0, 2, 0)
 			.build();
 

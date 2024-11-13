@@ -8,6 +8,7 @@ import dev.engine_room.flywheel.api.backend.Backend;
 import dev.engine_room.flywheel.api.backend.BackendManager;
 import dev.engine_room.flywheel.backend.compile.LightSmoothness;
 import dev.engine_room.flywheel.backend.compile.PipelineCompiler;
+import dev.engine_room.flywheel.backend.engine.LightStorage;
 import dev.engine_room.flywheel.backend.engine.uniform.DebugMode;
 import dev.engine_room.flywheel.backend.engine.uniform.FrameUniforms;
 import net.minecraft.client.Minecraft;
@@ -83,47 +84,7 @@ public final class FlwCommands {
 							return Command.SINGLE_SUCCESS;
 						})));
 
-		command.then(Commands.literal("crumbling")
-				.then(Commands.argument("pos", BlockPosArgument.blockPos())
-						.then(Commands.argument("stage", IntegerArgumentType.integer(0, 9))
-								.executes(context -> {
-									Entity executor = context.getSource()
-											.getEntity();
-
-									if (executor == null) {
-										return 0;
-									}
-
-									BlockPos pos = BlockPosArgument.getBlockPos(context, "pos");
-									int value = IntegerArgumentType.getInteger(context, "stage");
-
-									executor.level()
-											.destroyBlockProgress(executor.getId(), pos, value);
-
-									return Command.SINGLE_SUCCESS;
-								}))));
-
-		command.then(Commands.literal("debug")
-				.then(Commands.argument("mode", DebugModeArgument.INSTANCE)
-						.executes(context -> {
-							DebugMode mode = context.getArgument("mode", DebugMode.class);
-							FrameUniforms.debugMode(mode);
-							return Command.SINGLE_SUCCESS;
-						})));
-
-		command.then(Commands.literal("frustum")
-				.then(Commands.literal("capture")
-						.executes(context -> {
-							FrameUniforms.captureFrustum();
-							return Command.SINGLE_SUCCESS;
-						}))
-				.then(Commands.literal("unpause")
-						.executes(context -> {
-							FrameUniforms.unpauseFrustum();
-							return Command.SINGLE_SUCCESS;
-						})));
-
-		var lightSmoothnessValue = NeoForgeFlwConfig.INSTANCE.client.backendConfig.lightSmoothness;
+		var lightSmoothnessValue = ForgeFlwConfig.INSTANCE.client.backendConfig.lightSmoothness;
 		command.then(Commands.literal("lightSmoothness")
 				.then(Commands.argument("mode", LightSmoothnessArgument.INSTANCE)
 						.executes(context -> {
@@ -137,7 +98,7 @@ public final class FlwCommands {
 							return Command.SINGLE_SUCCESS;
 						})));
 
-		var useLightDirectionsValue = NeoForgeFlwConfig.INSTANCE.client.backendConfig.useLightDirections;
+		var useLightDirectionsValue = ForgeFlwConfig.INSTANCE.client.backendConfig.useLightDirections;
 		command.then(Commands.literal("useLightDirections")
 				.executes(context -> {
 					if (useLightDirectionsValue.get()) {
@@ -160,7 +121,66 @@ public final class FlwCommands {
 							return Command.SINGLE_SUCCESS;
 						})));
 
+		command.then(createDebugCommand());
+
 		event.getDispatcher().register(command);
+	}
+
+	private static LiteralArgumentBuilder<CommandSourceStack> createDebugCommand() {
+		var debug = Commands.literal("debug");
+
+		debug.then(Commands.literal("crumbling")
+				.then(Commands.argument("pos", BlockPosArgument.blockPos())
+						.then(Commands.argument("stage", IntegerArgumentType.integer(0, 9))
+								.executes(context -> {
+									Entity executor = context.getSource()
+											.getEntity();
+
+									if (executor == null) {
+										return 0;
+									}
+
+									BlockPos pos = BlockPosArgument.getBlockPos(context, "pos");
+									int value = IntegerArgumentType.getInteger(context, "stage");
+
+									executor.level()
+											.destroyBlockProgress(executor.getId(), pos, value);
+
+									return Command.SINGLE_SUCCESS;
+								}))));
+
+		debug.then(Commands.literal("shader")
+				.then(Commands.argument("mode", DebugModeArgument.INSTANCE)
+						.executes(context -> {
+							DebugMode mode = context.getArgument("mode", DebugMode.class);
+							FrameUniforms.debugMode(mode);
+							return Command.SINGLE_SUCCESS;
+						})));
+
+		debug.then(Commands.literal("frustum")
+				.then(Commands.literal("capture")
+						.executes(context -> {
+							FrameUniforms.captureFrustum();
+							return Command.SINGLE_SUCCESS;
+						}))
+				.then(Commands.literal("unpause")
+						.executes(context -> {
+							FrameUniforms.unpauseFrustum();
+							return Command.SINGLE_SUCCESS;
+						})));
+
+		debug.then(Commands.literal("lightSections")
+				.then(Commands.literal("on")
+						.executes(context -> {
+							LightStorage.DEBUG = true;
+							return Command.SINGLE_SUCCESS;
+						}))
+				.then(Commands.literal("off")
+						.executes(context -> {
+							LightStorage.DEBUG = false;
+							return Command.SINGLE_SUCCESS;
+						})));
+		return debug;
 	}
 
 	private static void sendMessage(CommandSourceStack source, Component message) {
