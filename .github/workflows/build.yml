@@ -43,7 +43,7 @@ jobs:
           path: |
             common/build/libs/
             fabric/build/libs/
-            forge/build/libs/
+            neoforge/build/libs/
 
   test:
     strategy:

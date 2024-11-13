@@ -116,7 +116,7 @@ abstract class LevelRendererMixin {
 
 	@Group(name = "afterParticles")
 	@Inject(method = "renderLevel", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/particle/ParticleEngine;render(Lnet/minecraft/client/renderer/LightTexture;Lnet/minecraft/client/Camera;FLnet/minecraft/client/renderer/culling/Frustum;Ljava/util/function/Predicate;)V", shift = Shift.AFTER))
-	private void flywheel$afterParticles$forge(CallbackInfo ci) {
+	private void flywheel$afterParticles$neoforge(CallbackInfo ci) {
 		if (flywheel$renderContext != null) {
 			VisualizationManager manager = VisualizationManager.get(level);
 			if (manager != null) {
