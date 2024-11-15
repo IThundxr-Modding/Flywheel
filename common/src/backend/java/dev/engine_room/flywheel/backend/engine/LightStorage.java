@@ -171,6 +171,8 @@ public class LightStorage implements Effect {
 			return;
 		}
 
+		boolean anyRemoved = false;
+
 		var entries = section2ArenaIndex.long2IntEntrySet();
 		var it = entries.iterator();
 		while (it.hasNext()) {
@@ -181,7 +183,13 @@ public class LightStorage implements Effect {
 				arena.free(entry.getIntValue());
 				endTrackingSection(section);
 				it.remove();
+				anyRemoved = true;
 			}
+		}
+
+		if (anyRemoved) {
+			lut.prune();
+			needsLutRebuild = true;
 		}
 	}
 
