@@ -23,6 +23,11 @@ public final class LightLut {
 				.set(z, index + 1);
 	}
 
+	public void prune() {
+		// Maybe this could be done better incrementally?
+		indices.prune((middle) -> middle.prune(IntLayer::prune));
+	}
+
 	public void remove(long section) {
 		final var x = SectionPos.x(section);
 		final var y = SectionPos.y(section);
@@ -47,6 +52,11 @@ public final class LightLut {
 		final var out = new IntArrayList();
 		indices.fillLut(out, (yIndices, lut) -> yIndices.fillLut(lut, IntLayer::fillLut));
 		return out;
+	}
+
+	@FunctionalInterface
+	public interface Prune<T> {
+		boolean prune(T t);
 	}
 
 	public static final class Layer<T> {
@@ -135,6 +145,69 @@ public final class LightLut {
 			return (T) out;
 		}
 
+		/**
+		 * @return {@code true} if the layer is now empty.
+		 */
+		public boolean prune(Prune<T> inner) {
+			if (!hasBase) {
+				return true;
+			}
+
+			// Prune the next layer before checking for leading/trailing zeros.
+			for (var i = 0; i < nextLayer.length; i++) {
+				var o = nextLayer[i];
+				if (o != null && inner.prune((T) o)) {
+					nextLayer[i] = null;
+				}
+			}
+
+			var leadingZeros = getLeadingZeros();
+
+			if (leadingZeros == nextLayer.length) {
+				return true;
+			}
+
+			var trailingZeros = getTrailingZeros();
+
+			if (leadingZeros == 0 && trailingZeros == 0) {
+				return false;
+			}
+
+			final var newIndices = new Object[nextLayer.length - leadingZeros - trailingZeros];
+
+			System.arraycopy(nextLayer, leadingZeros, newIndices, 0, newIndices.length);
+			nextLayer = newIndices;
+			base += leadingZeros;
+
+			return false;
+		}
+
+		private int getLeadingZeros() {
+			int out = 0;
+
+			for (Object index : nextLayer) {
+				if (index == null) {
+					out++;
+				} else {
+					break;
+				}
+			}
+			return out;
+		}
+
+		private int getTrailingZeros() {
+			int out = 0;
+
+			for (int i = nextLayer.length - 1; i >= 0; i--) {
+				if (nextLayer[i] == null) {
+					out++;
+				} else {
+					break;
+				}
+			}
+			return out;
+		}
+
 		private void resize(int length) {
 			final var newIndices = new Object[length];
 			System.arraycopy(nextLayer, 0, newIndices, 0, nextLayer.length);
@@ -212,6 +285,61 @@ public final class LightLut {
 			}
 
 			indices[offset] = index;
+		}
+
+		/**
+		 * @return {@code true} if the layer is now empty.
+		 */
+		public boolean prune() {
+			if (!hasBase) {
+				return true;
+			}
+
+			var leadingZeros = getLeadingZeros();
+
+			if (leadingZeros == indices.length) {
+				return true;
+			}
+
+			var trailingZeros = getTrailingZeros();
+
+			if (leadingZeros == 0 && trailingZeros == 0) {
+				return false;
+			}
+
+			final var newIndices = new int[indices.length - leadingZeros - trailingZeros];
+
+			System.arraycopy(indices, leadingZeros, newIndices, 0, newIndices.length);
+			indices = newIndices;
+			base += leadingZeros;
+
+			return false;
+		}
+
+		private int getTrailingZeros() {
+			int out = 0;
+
+			for (int i = indices.length - 1; i >= 0; i--) {
+				if (indices[i] == 0) {
+					out++;
+				} else {
+					break;
+				}
+			}
+			return out;
+		}
+
+		private int getLeadingZeros() {
+			int out = 0;
+
+			for (int index : indices) {
+				if (index == 0) {
+					out++;
+				} else {
+					break;
+				}
+			}
+			return out;
 		}
 
 		public void clear(int i) {

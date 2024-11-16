@@ -9,7 +9,10 @@
     "GlStateManagerMixin",
     "LevelRendererAccessor",
     "OptionsMixin",
-    "RenderSystemMixin"
+    "RenderSystemMixin",
+    "light.LightEngineAccessor",
+    "light.SkyDataLayerStorageMapAccessor",
+    "light.SkyLightSectionStorageMixin"
   ],
   "injectors": {
     "defaultRequire": 1

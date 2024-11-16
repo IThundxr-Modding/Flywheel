@@ -10,8 +10,11 @@ import dev.engine_room.flywheel.api.visual.Effect;
 import dev.engine_room.flywheel.api.visual.EffectVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.api.visualization.VisualizationManager;
+import dev.engine_room.flywheel.backend.BackendDebugFlags;
+import dev.engine_room.flywheel.backend.SkyLightSectionStorageExtension;
 import dev.engine_room.flywheel.backend.engine.indirect.StagingBuffer;
 import dev.engine_room.flywheel.backend.gl.buffer.GlBuffer;
+import dev.engine_room.flywheel.backend.mixin.light.LightEngineAccessor;
 import dev.engine_room.flywheel.lib.instance.InstanceTypes;
 import dev.engine_room.flywheel.lib.instance.TransformedInstance;
 import dev.engine_room.flywheel.lib.math.MoreMath;
@@ -27,9 +30,10 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
+import net.minecraft.core.Vec3i;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.lighting.LayerLightEventListener;
+import net.minecraft.world.level.chunk.DataLayer;
 
 /**
  * A managed arena of light sections for uploading to the GPU.
@@ -46,14 +50,15 @@ import net.minecraft.world.level.lighting.LayerLightEventListener;
  * <p>Thus, each section occupies 5832 bytes.
  */
 public class LightStorage implements Effect {
-	public static boolean DEBUG = false;
-
 	public static final int BLOCKS_PER_SECTION = 18 * 18 * 18;
 	public static final int LIGHT_SIZE_BYTES = BLOCKS_PER_SECTION;
 	public static final int SOLID_SIZE_BYTES = MoreMath.ceilingDiv(BLOCKS_PER_SECTION, Integer.SIZE) * Integer.BYTES;
 	public static final int SECTION_SIZE_BYTES = SOLID_SIZE_BYTES + LIGHT_SIZE_BYTES;
 	private static final int DEFAULT_ARENA_CAPACITY_SECTIONS = 64;
 	private static final int INVALID_SECTION = -1;
+
+	private static final ConstantDataLayer EMPTY_BLOCK_DATA = new ConstantDataLayer(0);
+	private static final ConstantDataLayer EMPTY_SKY_DATA = new ConstantDataLayer(15);
 
 	private final LevelAccessor level;
 	private final LightLut lut;
@@ -102,12 +107,12 @@ public class LightStorage implements Effect {
 
 	public <C> Plan<C> createFramePlan() {
 		return SimplePlan.of(() -> {
-			if (DEBUG != isDebugOn) {
+			if (BackendDebugFlags.LIGHT_STORAGE_VIEW != isDebugOn) {
 				var visualizationManager = VisualizationManager.get(level);
 
 				// Really should be non-null, but just in case.
 				if (visualizationManager != null) {
-					if (DEBUG) {
+					if (BackendDebugFlags.LIGHT_STORAGE_VIEW) {
 						visualizationManager.effects()
 								.queueAdd(this);
 					} else {
@@ -115,7 +120,7 @@ public class LightStorage implements Effect {
 								.queueRemove(this);
 					}
 				}
-				isDebugOn = DEBUG;
+				isDebugOn = BackendDebugFlags.LIGHT_STORAGE_VIEW;
 			}
 
 			if (updatedSections.isEmpty() && requestedSections == null) {
@@ -165,6 +170,8 @@ public class LightStorage implements Effect {
 			return;
 		}
 
+		boolean anyRemoved = false;
+
 		var entries = section2ArenaIndex.long2IntEntrySet();
 		var it = entries.iterator();
 		while (it.hasNext()) {
@@ -175,7 +182,13 @@ public class LightStorage implements Effect {
 				arena.free(entry.getIntValue());
 				endTrackingSection(section);
 				it.remove();
+				anyRemoved = true;
 			}
+		}
+
+		if (anyRemoved) {
+			lut.prune();
+			needsLutRebuild = true;
 		}
 	}
 
@@ -194,11 +207,6 @@ public class LightStorage implements Effect {
 	}
 
 	public void collectSection(long section) {
-		var lightEngine = level.getLightEngine();
-
-		var blockLight = lightEngine.getLayerListener(LightLayer.BLOCK);
-		var skyLight = lightEngine.getLayerListener(LightLayer.SKY);
-
 		int index = indexForSection(section);
 
 		changed.set(index);
@@ -210,21 +218,21 @@ public class LightStorage implements Effect {
 
 		collectSolidData(ptr, section);
 
-		collectCenter(blockLight, skyLight, ptr, section);
+		collectCenter(ptr, section);
 
 		for (SectionEdge i : SectionEdge.values()) {
-			collectYZPlane(blockLight, skyLight, ptr, SectionPos.offset(section, i.sectionOffset, 0, 0), i);
-			collectXZPlane(blockLight, skyLight, ptr, SectionPos.offset(section, 0, i.sectionOffset, 0), i);
-			collectXYPlane(blockLight, skyLight, ptr, SectionPos.offset(section, 0, 0, i.sectionOffset), i);
+			collectYZPlane(ptr, SectionPos.offset(section, i.sectionOffset, 0, 0), i);
+			collectXZPlane(ptr, SectionPos.offset(section, 0, i.sectionOffset, 0), i);
+			collectXYPlane(ptr, SectionPos.offset(section, 0, 0, i.sectionOffset), i);
 
 			for (SectionEdge j : SectionEdge.values()) {
-				collectXStrip(blockLight, skyLight, ptr, SectionPos.offset(section, 0, i.sectionOffset, j.sectionOffset), i, j);
-				collectYStrip(blockLight, skyLight, ptr, SectionPos.offset(section, i.sectionOffset, 0, j.sectionOffset), i, j);
-				collectZStrip(blockLight, skyLight, ptr, SectionPos.offset(section, i.sectionOffset, j.sectionOffset, 0), i, j);
+				collectXStrip(ptr, SectionPos.offset(section, 0, i.sectionOffset, j.sectionOffset), i, j);
+				collectYStrip(ptr, SectionPos.offset(section, i.sectionOffset, 0, j.sectionOffset), i, j);
+				collectZStrip(ptr, SectionPos.offset(section, i.sectionOffset, j.sectionOffset, 0), i, j);
 			}
 		}
 
-		collectCorners(blockLight, skyLight, ptr, section);
+		collectCorners(ptr, section);
 	}
 
 	private void collectSolidData(long ptr, long section) {
@@ -259,64 +267,59 @@ public class LightStorage implements Effect {
 		}
 	}
 
-	private void writeSolid(long ptr, int index, boolean blockValid) {
-		if (!blockValid) {
-			return;
+	private DataLayer getSkyData(long section) {
+		var sky = level.getLightEngine()
+				.getLayerListener(LightLayer.SKY);
+		var skyStorage = (SkyLightSectionStorageExtension) ((LightEngineAccessor<?, ?>) sky).flywheel$storage();
+
+		var out = skyStorage.flywheel$skyDataLayer(section);
+
+		if (out == null) {
+			return EMPTY_SKY_DATA;
 		}
-		int intIndex = index / Integer.SIZE;
-		int bitIndex = index % Integer.SIZE;
 
-		long offset = intIndex * Integer.BYTES;
-
-		int bitField = MemoryUtil.memGetInt(ptr + offset);
-		bitField |= 1 << bitIndex;
-
-		MemoryUtil.memPutInt(ptr + offset, bitField);
+		return out;
 	}
 
-	private void collectXStrip(LayerLightEventListener blockLight, LayerLightEventListener skyLight, long ptr, long section, SectionEdge y, SectionEdge z) {
-		var pos = SectionPos.of(section);
-		var blockData = blockLight.getDataLayerData(pos);
-		var skyData = skyLight.getDataLayerData(pos);
-		if (blockData == null || skyData == null) {
-			return;
+	private DataLayer getBlockData(long section) {
+		var out = ((LightEngineAccessor<?, ?>) level.getLightEngine()
+				.getLayerListener(LightLayer.BLOCK)).flywheel$storage()
+				.getDataLayerData(section);
+
+		if (out == null) {
+			return EMPTY_BLOCK_DATA;
 		}
+
+		return out;
+	}
+
+	private void collectXStrip(long ptr, long section, SectionEdge y, SectionEdge z) {
+		var blockData = getBlockData(section);
+		var skyData = getSkyData(section);
 		for (int x = 0; x < 16; x++) {
 			write(ptr, x, y.relative, z.relative, blockData.get(x, y.pos, z.pos), skyData.get(x, y.pos, z.pos));
 		}
 	}
 
-	private void collectYStrip(LayerLightEventListener blockLight, LayerLightEventListener skyLight, long ptr, long section, SectionEdge x, SectionEdge z) {
-		var pos = SectionPos.of(section);
-		var blockData = blockLight.getDataLayerData(pos);
-		var skyData = skyLight.getDataLayerData(pos);
-		if (blockData == null || skyData == null) {
-			return;
-		}
+	private void collectYStrip(long ptr, long section, SectionEdge x, SectionEdge z) {
+		var blockData = getBlockData(section);
+		var skyData = getSkyData(section);
 		for (int y = 0; y < 16; y++) {
 			write(ptr, x.relative, y, z.relative, blockData.get(x.pos, y, z.pos), skyData.get(x.pos, y, z.pos));
 		}
 	}
 
-	private void collectZStrip(LayerLightEventListener blockLight, LayerLightEventListener skyLight, long ptr, long section, SectionEdge x, SectionEdge y) {
-		var pos = SectionPos.of(section);
-		var blockData = blockLight.getDataLayerData(pos);
-		var skyData = skyLight.getDataLayerData(pos);
-		if (blockData == null || skyData == null) {
-			return;
-		}
+	private void collectZStrip(long ptr, long section, SectionEdge x, SectionEdge y) {
+		var blockData = getBlockData(section);
+		var skyData = getSkyData(section);
 		for (int z = 0; z < 16; z++) {
 			write(ptr, x.relative, y.relative, z, blockData.get(x.pos, y.pos, z), skyData.get(x.pos, y.pos, z));
 		}
 	}
 
-	private void collectYZPlane(LayerLightEventListener blockLight, LayerLightEventListener skyLight, long ptr, long section, SectionEdge x) {
-		var pos = SectionPos.of(section);
-		var blockData = blockLight.getDataLayerData(pos);
-		var skyData = skyLight.getDataLayerData(pos);
-		if (blockData == null || skyData == null) {
-			return;
-		}
+	private void collectYZPlane(long ptr, long section, SectionEdge x) {
+		var blockData = getBlockData(section);
+		var skyData = getSkyData(section);
 		for (int y = 0; y < 16; y++) {
 			for (int z = 0; z < 16; z++) {
 				write(ptr, x.relative, y, z, blockData.get(x.pos, y, z), skyData.get(x.pos, y, z));
@@ -324,13 +327,9 @@ public class LightStorage implements Effect {
 		}
 	}
 
-	private void collectXZPlane(LayerLightEventListener blockLight, LayerLightEventListener skyLight, long ptr, long section, SectionEdge y) {
-		var pos = SectionPos.of(section);
-		var blockData = blockLight.getDataLayerData(pos);
-		var skyData = skyLight.getDataLayerData(pos);
-		if (blockData == null || skyData == null) {
-			return;
-		}
+	private void collectXZPlane(long ptr, long section, SectionEdge y) {
+		var blockData = getBlockData(section);
+		var skyData = getSkyData(section);
 		for (int z = 0; z < 16; z++) {
 			for (int x = 0; x < 16; x++) {
 				write(ptr, x, y.relative, z, blockData.get(x, y.pos, z), skyData.get(x, y.pos, z));
@@ -338,13 +337,9 @@ public class LightStorage implements Effect {
 		}
 	}
 
-	private void collectXYPlane(LayerLightEventListener blockLight, LayerLightEventListener skyLight, long ptr, long section, SectionEdge z) {
-		var pos = SectionPos.of(section);
-		var blockData = blockLight.getDataLayerData(pos);
-		var skyData = skyLight.getDataLayerData(pos);
-		if (blockData == null || skyData == null) {
-			return;
-		}
+	private void collectXYPlane(long ptr, long section, SectionEdge z) {
+		var blockData = getBlockData(section);
+		var skyData = getSkyData(section);
 		for (int y = 0; y < 16; y++) {
 			for (int x = 0; x < 16; x++) {
 				write(ptr, x, y, z.relative, blockData.get(x, y, z.pos), skyData.get(x, y, z.pos));
@@ -352,13 +347,9 @@ public class LightStorage implements Effect {
 		}
 	}
 
-	private void collectCenter(LayerLightEventListener blockLight, LayerLightEventListener skyLight, long ptr, long section) {
-		var pos = SectionPos.of(section);
-		var blockData = blockLight.getDataLayerData(pos);
-		var skyData = skyLight.getDataLayerData(pos);
-		if (blockData == null || skyData == null) {
-			return;
-		}
+	private void collectCenter(long ptr, long section) {
+		var blockData = getBlockData(section);
+		var skyData = getSkyData(section);
 		for (int y = 0; y < 16; y++) {
 			for (int z = 0; z < 16; z++) {
 				for (int x = 0; x < 16; x++) {
@@ -368,7 +359,12 @@ public class LightStorage implements Effect {
 		}
 	}
 
-	private void collectCorners(LayerLightEventListener blockLight, LayerLightEventListener skyLight, long ptr, long section) {
+	private void collectCorners(long ptr, long section) {
+		var lightEngine = level.getLightEngine();
+
+		var blockLight = lightEngine.getLayerListener(LightLayer.BLOCK);
+		var skyLight = lightEngine.getLayerListener(LightLayer.SKY);
+
 		var blockPos = new BlockPos.MutableBlockPos();
 		int xMin = SectionPos.sectionToBlockCoord(SectionPos.x(section));
 		int yMin = SectionPos.sectionToBlockCoord(SectionPos.y(section));
@@ -485,8 +481,10 @@ public class LightStorage implements Effect {
 	public class DebugVisual implements EffectVisual<LightStorage>, SimpleDynamicVisual {
 
 		private final InstanceRecycler<TransformedInstance> boxes;
+		private final Vec3i renderOrigin;
 
 		public DebugVisual(VisualizationContext ctx, float partialTick) {
+			renderOrigin = ctx.renderOrigin();
 			boxes = new InstanceRecycler<>(() -> ctx.instancerProvider()
 					.instancer(InstanceTypes.TRANSFORMED, HitboxComponent.BOX_MODEL)
 					.createInstance());
@@ -505,15 +503,15 @@ public class LightStorage implements Effect {
 		private void setupSectionBoxes() {
 			section2ArenaIndex.keySet()
 					.forEach(l -> {
-						var x = SectionPos.x(l);
-						var y = SectionPos.y(l);
-						var z = SectionPos.z(l);
+						var x = SectionPos.x(l) * 16 - renderOrigin.getX();
+						var y = SectionPos.y(l) * 16 - renderOrigin.getY();
+						var z = SectionPos.z(l) * 16 - renderOrigin.getZ();
 
 						var instance = boxes.get();
 
 						instance.setIdentityTransform()
-								.scale(16)
 								.translate(x, y, z)
+								.scale(16)
 								.color(255, 255, 0)
 								.light(LightTexture.FULL_BRIGHT)
 								.setChanged();
@@ -526,6 +524,14 @@ public class LightStorage implements Effect {
 			var base1 = first.base();
 			var size1 = first.size();
 
+			float debug1 = base1 * 16 - renderOrigin.getY();
+
+			float min2 = Float.POSITIVE_INFINITY;
+			float max2 = Float.NEGATIVE_INFINITY;
+
+			float min3 = Float.POSITIVE_INFINITY;
+			float max3 = Float.NEGATIVE_INFINITY;
+
 			for (int y = 0; y < size1; y++) {
 				var second = first.getRaw(y);
 
@@ -535,6 +541,16 @@ public class LightStorage implements Effect {
 
 				var base2 = second.base();
 				var size2 = second.size();
+
+				float y2 = (base1 + y) * 16 - renderOrigin.getY() + 7.5f;
+
+				min2 = Math.min(min2, base2);
+				max2 = Math.max(max2, base2 + size2);
+
+				float minLocal3 = Float.POSITIVE_INFINITY;
+				float maxLocal3 = Float.NEGATIVE_INFINITY;
+
+				float debug2 = base2 * 16 - renderOrigin.getX();
 
 				for (int x = 0; x < size2; x++) {
 					var third = second.getRaw(x);
@@ -546,55 +562,43 @@ public class LightStorage implements Effect {
 					var base3 = third.base();
 					var size3 = third.size();
 
+					float x2 = (base2 + x) * 16 - renderOrigin.getX() + 7.5f;
+
+					min3 = Math.min(min3, base3);
+					max3 = Math.max(max3, base3 + size3);
+
+					minLocal3 = Math.min(minLocal3, base3);
+					maxLocal3 = Math.max(maxLocal3, base3 + size3);
+
+					float debug3 = base3 * 16 - renderOrigin.getZ();
+
 					for (int z = 0; z < size3; z++) {
-						float x1 = base2 * 16;
-						float y1 = base1 * 16;
-						float z1 = base3 * 16;
-
-						float x2 = (base2 + x) * 16 + 7.5f;
-						float y2 = (base1 + y) * 16 + 7.5f;
-						float z2 = (base3 + z) * 16 + 7.5f;
 						boxes.get()
 								.setIdentityTransform()
-								.translate(x1, y2, z2)
-								.scale(size2 * 16, 1, 1)
-								.color(255, 0, 0)
-								.light(LightTexture.FULL_BRIGHT)
-								.setChanged();
-
-						boxes.get()
-								.setIdentityTransform()
-								.translate(x2, y1, z2)
-								.scale(1, size1 * 16, 1)
-								.color(0, 255, 0)
-								.light(LightTexture.FULL_BRIGHT)
-								.setChanged();
-
-						boxes.get()
-								.setIdentityTransform()
-								.translate(x2, y2, z1)
+								.translate(x2, y2, debug3)
 								.scale(1, 1, size3 * 16)
 								.color(0, 0, 255)
 								.light(LightTexture.FULL_BRIGHT)
 								.setChanged();
-
-						if (third.getRaw(z) == 0) {
-							float x3 = (base2 + x) * 16 + 6f;
-							float y3 = (base1 + y) * 16 + 6f;
-							float z3 = (base3 + z) * 16 + 6f;
-
-							// Freely representable section that is not filled.
-							boxes.get()
-									.setIdentityTransform()
-									.translate(x3, y3, z3)
-									.scale(4)
-									.color(0, 255, 255)
-									.light(LightTexture.FULL_BRIGHT)
-									.setChanged();
-						}
 					}
 				}
+
+				boxes.get()
+						.setIdentityTransform()
+						.translate(debug2, y2, minLocal3 * 16 - renderOrigin.getZ())
+						.scale(size2 * 16, 1, (maxLocal3 - minLocal3) * 16)
+						.color(255, 0, 0)
+						.light(LightTexture.FULL_BRIGHT)
+						.setChanged();
 			}
+
+			boxes.get()
+					.setIdentityTransform()
+					.translate(min2 * 16 - renderOrigin.getX(), debug1, min3 * 16 - renderOrigin.getZ())
+					.scale((max2 - min2) * 16, size1 * 16, (max3 - min3) * 16)
+					.color(0, 255, 0)
+					.light(LightTexture.FULL_BRIGHT)
+					.setChanged();
 		}
 
 		@Override
@@ -605,6 +609,19 @@ public class LightStorage implements Effect {
 		@Override
 		public void delete() {
 			boxes.delete();
+		}
+	}
+
+	private static class ConstantDataLayer extends DataLayer {
+		private final int value;
+
+		private ConstantDataLayer(int value) {
+			this.value = value;
+		}
+
+		@Override
+		public int get(int x, int y, int z) {
+			return value;
 		}
 	}
 }
