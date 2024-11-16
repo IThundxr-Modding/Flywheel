@@ -16,6 +16,7 @@ import org.lwjgl.system.MemoryStack;
 
 import dev.engine_room.flywheel.backend.FlwBackend;
 import dev.engine_room.flywheel.backend.compile.core.Compilation;
+import dev.engine_room.flywheel.backend.gl.shader.GlProgram;
 import dev.engine_room.flywheel.backend.glsl.GlslVersion;
 import dev.engine_room.flywheel.lib.math.MoreMath;
 
@@ -78,15 +79,20 @@ public final class GlCompat {
 	 * but uses consecutive DI instead of MDI if MDI is known to not work well with the current driver.
 	 * Unlike the original function, stride cannot be equal to 0.
 	 */
-	public static void safeMultiDrawElementsIndirect(int mode, int type, long indirect, int drawcount, int stride) {
+	public static void safeMultiDrawElementsIndirect(GlProgram drawProgram, int mode, int type, int start, int end, long stride) {
+		var count = end - start;
+		long indirect = start * stride;
+
 		if (GlCompat.DRIVER == Driver.INTEL) {
-			// Intel renders garbage with MDI, but consecutive DI works fine.
-			for (int i = 0; i < drawcount; i++) {
+			// Intel renders garbage with MDI, but consecutive DI works "fine".
+			for (int i = 0; i < count; i++) {
+				drawProgram.setUInt("_flw_baseDraw", start + i);
 				GL40.glDrawElementsIndirect(mode, type, indirect);
 				indirect += stride;
 			}
 		} else {
-			GL43.glMultiDrawElementsIndirect(mode, type, indirect, drawcount, stride);
+			drawProgram.setUInt("_flw_baseDraw", start);
+			GL43.glMultiDrawElementsIndirect(mode, type, indirect, count, (int) stride);
 		}
 	}
 

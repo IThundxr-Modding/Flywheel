@@ -199,7 +199,6 @@ public class IndirectCullingGroup<I extends Instance> {
 		drawBarrier();
 
 		GlProgram lastProgram = null;
-		int baseDrawUniformLoc = -1;
 
 		for (var multiDraw : multiDraws.get(visualType)) {
 			var drawProgram = programs.getIndirectProgram(instanceType, multiDraw.embedded ? ContextShader.EMBEDDED : ContextShader.DEFAULT, multiDraw.material);
@@ -208,14 +207,11 @@ public class IndirectCullingGroup<I extends Instance> {
 
 				// Don't need to do this unless the program changes.
 				drawProgram.bind();
-				baseDrawUniformLoc = drawProgram.getUniformLocation("_flw_baseDraw");
 			}
-
-			glUniform1ui(baseDrawUniformLoc, multiDraw.start);
 
 			MaterialRenderState.setup(multiDraw.material);
 
-			multiDraw.submit();
+			multiDraw.submit(drawProgram);
 		}
 	}
 
@@ -290,8 +286,8 @@ public class IndirectCullingGroup<I extends Instance> {
 	}
 
 	private record MultiDraw(Material material, boolean embedded, int start, int end) {
-		private void submit() {
-			GlCompat.safeMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, this.start * IndirectBuffers.DRAW_COMMAND_STRIDE, this.end - this.start, (int) IndirectBuffers.DRAW_COMMAND_STRIDE);
+		private void submit(GlProgram drawProgram) {
+			GlCompat.safeMultiDrawElementsIndirect(drawProgram, GL_TRIANGLES, GL_UNSIGNED_INT, this.start, this.end, IndirectBuffers.DRAW_COMMAND_STRIDE);
 		}
 	}
 }

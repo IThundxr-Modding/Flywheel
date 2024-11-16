@@ -25,6 +25,9 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 	private final Vector4fc boundingSphere;
 
 	private final AtomicReference<InstancePage<I>[]> pages = new AtomicReference<>(pageArray(0));
+
+	private final AtomicInteger instanceCount = new AtomicInteger(0);
+
 	/**
 	 * The set of pages whose count changed and thus need their descriptor re-uploaded.
 	 */
@@ -145,6 +148,8 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 						// We just filled the 17th instance, so we are no longer mergeable.
 						parent.mergeablePages.clear(pageNo);
 					}
+
+					parent.instanceCount.incrementAndGet();
 					return true;
 				}
 			}
@@ -203,6 +208,7 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 					}
 					// Set full page last so that other threads don't race to set the other bitsets.
 					parent.fullPages.clear(pageNo);
+					parent.instanceCount.decrementAndGet();
 					break;
 				}
 			}
@@ -538,9 +544,7 @@ public class IndirectInstancer<I extends Instance> extends AbstractInstancer<I> 
 	}
 
 	public int instanceCount() {
-		// Not exactly accurate but it's an upper bound.
-		// TODO: maybe this could be tracked with an AtomicInteger?
-		return pages.get().length << ObjectStorage.LOG_2_PAGE_SIZE;
+		return instanceCount.get();
 	}
 
 	/**
