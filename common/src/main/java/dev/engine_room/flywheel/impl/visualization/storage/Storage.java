@@ -15,6 +15,8 @@ import dev.engine_room.flywheel.api.visual.ShaderLightVisual;
 import dev.engine_room.flywheel.api.visual.TickableVisual;
 import dev.engine_room.flywheel.api.visual.Visual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
+import dev.engine_room.flywheel.impl.ImplDebugFlags;
+import dev.engine_room.flywheel.lib.task.ConditionalPlan;
 import dev.engine_room.flywheel.lib.task.ForEachPlan;
 import dev.engine_room.flywheel.lib.task.NestedPlan;
 import dev.engine_room.flywheel.lib.task.PlanMap;
@@ -42,11 +44,16 @@ public abstract class Storage<T> {
 	}
 
 	public Plan<DynamicVisual.Context> framePlan() {
-		return NestedPlan.of(dynamicVisuals, lightUpdatedVisuals.plan(), ForEachPlan.of(() -> simpleDynamicVisuals, SimpleDynamicVisual::beginFrame));
+		var update = ConditionalPlan.<DynamicVisual.Context>on(() -> !ImplDebugFlags.PAUSE_UPDATES)
+				.then(NestedPlan.of(dynamicVisuals, ForEachPlan.of(() -> simpleDynamicVisuals, SimpleDynamicVisual::beginFrame)));
+
+		// Do light updates regardless.
+		return NestedPlan.of(lightUpdatedVisuals.plan(), update);
 	}
 
 	public Plan<TickableVisual.Context> tickPlan() {
-		return NestedPlan.of(tickableVisuals, ForEachPlan.of(() -> simpleTickableVisuals, SimpleTickableVisual::tick));
+		return ConditionalPlan.<TickableVisual.Context>on(() -> !ImplDebugFlags.PAUSE_UPDATES)
+				.then(NestedPlan.of(tickableVisuals, ForEachPlan.of(() -> simpleTickableVisuals, SimpleTickableVisual::tick)));
 	}
 
 	public LightUpdatedVisualStorage lightUpdatedVisuals() {

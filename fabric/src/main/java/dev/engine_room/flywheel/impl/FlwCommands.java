@@ -8,9 +8,9 @@ import com.mojang.brigadier.context.CommandContext;
 
 import dev.engine_room.flywheel.api.backend.Backend;
 import dev.engine_room.flywheel.api.backend.BackendManager;
+import dev.engine_room.flywheel.backend.BackendDebugFlags;
 import dev.engine_room.flywheel.backend.compile.LightSmoothness;
 import dev.engine_room.flywheel.backend.compile.PipelineCompiler;
-import dev.engine_room.flywheel.backend.engine.LightStorage;
 import dev.engine_room.flywheel.backend.engine.uniform.DebugMode;
 import dev.engine_room.flywheel.backend.engine.uniform.FrameUniforms;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
@@ -179,12 +179,24 @@ public final class FlwCommands {
 		debug.then(ClientCommandManager.literal("lightSections")
 				.then(ClientCommandManager.literal("on")
 						.executes(context -> {
-							LightStorage.DEBUG = true;
+							BackendDebugFlags.LIGHT_STORAGE_VIEW = true;
 							return Command.SINGLE_SUCCESS;
 						}))
 				.then(ClientCommandManager.literal("off")
 						.executes(context -> {
-							LightStorage.DEBUG = false;
+							BackendDebugFlags.LIGHT_STORAGE_VIEW = false;
+							return Command.SINGLE_SUCCESS;
+						})));
+
+		debug.then(ClientCommandManager.literal("pauseUpdates")
+				.then(ClientCommandManager.literal("on")
+						.executes(context -> {
+							ImplDebugFlags.PAUSE_UPDATES = true;
+							return Command.SINGLE_SUCCESS;
+						}))
+				.then(ClientCommandManager.literal("off")
+						.executes(context -> {
+							ImplDebugFlags.PAUSE_UPDATES = false;
 							return Command.SINGLE_SUCCESS;
 						})));
 

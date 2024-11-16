@@ -10,6 +10,7 @@ import dev.engine_room.flywheel.api.visual.Effect;
 import dev.engine_room.flywheel.api.visual.EffectVisual;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
 import dev.engine_room.flywheel.api.visualization.VisualizationManager;
+import dev.engine_room.flywheel.backend.BackendDebugFlags;
 import dev.engine_room.flywheel.backend.SkyLightSectionStorageExtension;
 import dev.engine_room.flywheel.backend.engine.indirect.StagingBuffer;
 import dev.engine_room.flywheel.backend.gl.buffer.GlBuffer;
@@ -49,8 +50,6 @@ import net.minecraft.world.level.chunk.DataLayer;
  * <p>Thus, each section occupies 5832 bytes.
  */
 public class LightStorage implements Effect {
-	public static boolean DEBUG = false;
-
 	public static final int BLOCKS_PER_SECTION = 18 * 18 * 18;
 	public static final int LIGHT_SIZE_BYTES = BLOCKS_PER_SECTION;
 	public static final int SOLID_SIZE_BYTES = MoreMath.ceilingDiv(BLOCKS_PER_SECTION, Integer.SIZE) * Integer.BYTES;
@@ -108,12 +107,12 @@ public class LightStorage implements Effect {
 
 	public <C> Plan<C> createFramePlan() {
 		return SimplePlan.of(() -> {
-			if (DEBUG != isDebugOn) {
+			if (BackendDebugFlags.LIGHT_STORAGE_VIEW != isDebugOn) {
 				var visualizationManager = VisualizationManager.get(level);
 
 				// Really should be non-null, but just in case.
 				if (visualizationManager != null) {
-					if (DEBUG) {
+					if (BackendDebugFlags.LIGHT_STORAGE_VIEW) {
 						visualizationManager.effects()
 								.queueAdd(this);
 					} else {
@@ -121,7 +120,7 @@ public class LightStorage implements Effect {
 								.queueRemove(this);
 					}
 				}
-				isDebugOn = DEBUG;
+				isDebugOn = BackendDebugFlags.LIGHT_STORAGE_VIEW;
 			}
 
 			if (updatedSections.isEmpty() && requestedSections == null) {
