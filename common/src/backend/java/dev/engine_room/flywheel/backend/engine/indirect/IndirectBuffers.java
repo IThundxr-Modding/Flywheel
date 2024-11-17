@@ -109,11 +109,9 @@ public class IndirectBuffers {
 		GlBufferType.DRAW_INDIRECT_BUFFER.bind(draw.handle());
 	}
 
-	/**
-	 * Bind all buffers except the draw command buffer.
-	 */
 	public void bindForCrumbling() {
-		multiBind(1, 4);
+		// All we need is the instance buffer. Crumbling uses its own draw buffer.
+		multiBind(BufferBindings.INSTANCE, 1);
 	}
 
 	private void multiBind(int base, int count) {

@@ -17,7 +17,6 @@ import dev.engine_room.flywheel.api.instance.Instance;
 import dev.engine_room.flywheel.api.instance.InstanceType;
 import dev.engine_room.flywheel.api.visualization.VisualType;
 import dev.engine_room.flywheel.backend.Samplers;
-import dev.engine_room.flywheel.backend.compile.ContextShader;
 import dev.engine_room.flywheel.backend.compile.IndirectPrograms;
 import dev.engine_room.flywheel.backend.engine.AbstractInstancer;
 import dev.engine_room.flywheel.backend.engine.CommonCrumbling;
@@ -235,7 +234,7 @@ public class IndirectDrawManager extends DrawManager<IndirectInstancer<?>> {
 						// Transform the material to be suited for crumbling.
 						CommonCrumbling.applyCrumblingProperties(crumblingMaterial, draw.material());
 
-						cullingGroup.bindWithContextShader(ContextShader.CRUMBLING, crumblingMaterial);
+						cullingGroup.bindForCrumbling(crumblingMaterial);
 
 						MaterialRenderState.setup(crumblingMaterial);
 

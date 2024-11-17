@@ -2,7 +2,6 @@ package dev.engine_room.flywheel.backend.engine.indirect;
 
 import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
-import static org.lwjgl.opengl.GL30.glUniform1ui;
 import static org.lwjgl.opengl.GL42.GL_COMMAND_BARRIER_BIT;
 import static org.lwjgl.opengl.GL42.glMemoryBarrier;
 import static org.lwjgl.opengl.GL43.glDispatchCompute;
@@ -215,8 +214,8 @@ public class IndirectCullingGroup<I extends Instance> {
 		}
 	}
 
-	public void bindWithContextShader(ContextShader override, Material material) {
-		var program = programs.getIndirectProgram(instanceType, override, material);
+	public void bindForCrumbling(Material material) {
+		var program = programs.getIndirectProgram(instanceType, ContextShader.CRUMBLING, material);
 
 		program.bind();
 
@@ -224,8 +223,7 @@ public class IndirectCullingGroup<I extends Instance> {
 
 		drawBarrier();
 
-		var flwBaseDraw = program.getUniformLocation("_flw_baseDraw");
-		glUniform1ui(flwBaseDraw, 0);
+		program.setUInt("_flw_baseDraw", 0);
 	}
 
 	private void drawBarrier() {
