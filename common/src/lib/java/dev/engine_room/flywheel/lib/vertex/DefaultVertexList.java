@@ -1,7 +1,6 @@
 package dev.engine_room.flywheel.lib.vertex;
 
 import dev.engine_room.flywheel.api.vertex.MutableVertexList;
-import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 
 public interface DefaultVertexList extends MutableVertexList {
@@ -57,7 +56,7 @@ public interface DefaultVertexList extends MutableVertexList {
 
 	@Override
 	default int light(int index) {
-		return LightTexture.FULL_BRIGHT;
+		return 0;
 	}
 
 	@Override
