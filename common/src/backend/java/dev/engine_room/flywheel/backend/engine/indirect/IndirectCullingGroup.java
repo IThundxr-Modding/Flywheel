@@ -2,7 +2,6 @@ package dev.engine_room.flywheel.backend.engine.indirect;
 
 import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
-import static org.lwjgl.opengl.GL30.glUniform1ui;
 import static org.lwjgl.opengl.GL42.GL_COMMAND_BARRIER_BIT;
 import static org.lwjgl.opengl.GL42.glMemoryBarrier;
 import static org.lwjgl.opengl.GL43.glDispatchCompute;
@@ -199,7 +198,6 @@ public class IndirectCullingGroup<I extends Instance> {
 		drawBarrier();
 
 		GlProgram lastProgram = null;
-		int baseDrawUniformLoc = -1;
 
 		for (var multiDraw : multiDraws.get(visualType)) {
 			var drawProgram = programs.getIndirectProgram(instanceType, multiDraw.embedded ? ContextShader.EMBEDDED : ContextShader.DEFAULT, multiDraw.material);
@@ -208,19 +206,16 @@ public class IndirectCullingGroup<I extends Instance> {
 
 				// Don't need to do this unless the program changes.
 				drawProgram.bind();
-				baseDrawUniformLoc = drawProgram.getUniformLocation("_flw_baseDraw");
 			}
-
-			glUniform1ui(baseDrawUniformLoc, multiDraw.start);
 
 			MaterialRenderState.setup(multiDraw.material);
 
-			multiDraw.submit();
+			multiDraw.submit(drawProgram);
 		}
 	}
 
-	public void bindWithContextShader(ContextShader override, Material material) {
-		var program = programs.getIndirectProgram(instanceType, override, material);
+	public void bindForCrumbling(Material material) {
+		var program = programs.getIndirectProgram(instanceType, ContextShader.CRUMBLING, material);
 
 		program.bind();
 
@@ -228,8 +223,7 @@ public class IndirectCullingGroup<I extends Instance> {
 
 		drawBarrier();
 
-		var flwBaseDraw = program.getUniformLocation("_flw_baseDraw");
-		glUniform1ui(flwBaseDraw, 0);
+		program.setUInt("_flw_baseDraw", 0);
 	}
 
 	private void drawBarrier() {
@@ -290,8 +284,8 @@ public class IndirectCullingGroup<I extends Instance> {
 	}
 
 	private record MultiDraw(Material material, boolean embedded, int start, int end) {
-		private void submit() {
-			GlCompat.safeMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, this.start * IndirectBuffers.DRAW_COMMAND_STRIDE, this.end - this.start, (int) IndirectBuffers.DRAW_COMMAND_STRIDE);
+		private void submit(GlProgram drawProgram) {
+			GlCompat.safeMultiDrawElementsIndirect(drawProgram, GL_TRIANGLES, GL_UNSIGNED_INT, this.start, this.end, IndirectBuffers.DRAW_COMMAND_STRIDE);
 		}
 	}
 }

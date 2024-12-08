@@ -1,6 +1,7 @@
 package dev.engine_room.flywheel.backend.engine;
 
 import java.util.BitSet;
+import java.util.Objects;
 
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
@@ -34,6 +35,7 @@ import net.minecraft.core.Vec3i;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.lighting.LayerLightEventListener;
 
 /**
  * A managed arena of light sections for uploading to the GPU.
@@ -57,8 +59,8 @@ public class LightStorage implements Effect {
 	private static final int DEFAULT_ARENA_CAPACITY_SECTIONS = 64;
 	private static final int INVALID_SECTION = -1;
 
-	private static final ConstantDataLayer EMPTY_BLOCK_DATA = new ConstantDataLayer(0);
-	private static final ConstantDataLayer EMPTY_SKY_DATA = new ConstantDataLayer(15);
+	private static final ConstantDataLayer ALWAYS_0 = new ConstantDataLayer(0);
+	private static final ConstantDataLayer ALWAYS_15 = new ConstantDataLayer(15);
 
 	private final LevelAccessor level;
 	private final LightLut lut;
@@ -268,29 +270,51 @@ public class LightStorage implements Effect {
 	}
 
 	private DataLayer getSkyData(long section) {
-		var sky = level.getLightEngine()
+		var layerListener = level.getLightEngine()
 				.getLayerListener(LightLayer.SKY);
-		var skyStorage = (SkyLightSectionStorageExtension) ((LightEngineAccessor<?, ?>) sky).flywheel$storage();
 
-		var out = skyStorage.flywheel$skyDataLayer(section);
-
-		if (out == null) {
-			return EMPTY_SKY_DATA;
+		if (layerListener == LayerLightEventListener.DummyLightLayerEventListener.INSTANCE) {
+			// The dummy listener always returns 0.
+			// In vanilla this happens in the nether and end,
+			// and the light texture is simply updated
+			// to be invariant on sky light.
+			return ALWAYS_0;
 		}
 
-		return out;
+		if (layerListener instanceof LightEngineAccessor<?, ?> accessor) {
+			// Sky storage has a fancy way to get the sky light at a given block position, but the logic is not
+			// implemented in vanilla for fetching data layers directly. We need to re-implement it here. The simplest
+			// way to do it was to expose the same logic via an extension method. Re-implementing it external to the
+			// SkyLightSectionStorage class would require many more accessors.
+			if (accessor.flywheel$storage() instanceof SkyLightSectionStorageExtension skyStorage) {
+				var out = skyStorage.flywheel$skyDataLayer(section);
+
+				// Null section here means there are no blocks above us to darken this section.
+				return Objects.requireNonNullElse(out, ALWAYS_15);
+			}
+		}
+
+		// FIXME: We're likely in some exotic dimension that needs special handling.
+		return ALWAYS_0;
 	}
 
 	private DataLayer getBlockData(long section) {
-		var out = ((LightEngineAccessor<?, ?>) level.getLightEngine()
-				.getLayerListener(LightLayer.BLOCK)).flywheel$storage()
-				.getDataLayerData(section);
+		var layerListener = level.getLightEngine()
+				.getLayerListener(LightLayer.BLOCK);
 
-		if (out == null) {
-			return EMPTY_BLOCK_DATA;
+		if (layerListener == LayerLightEventListener.DummyLightLayerEventListener.INSTANCE) {
+			return ALWAYS_0;
 		}
 
-		return out;
+		if (layerListener instanceof LightEngineAccessor<?, ?> accessor) {
+			var out = accessor.flywheel$storage()
+					.getDataLayerData(section);
+
+			return Objects.requireNonNullElse(out, ALWAYS_0);
+		}
+
+		// FIXME: We're likely in some exotic dimension that needs special handling.
+		return ALWAYS_0;
 	}
 
 	private void collectXStrip(long ptr, long section, SectionEdge y, SectionEdge z) {

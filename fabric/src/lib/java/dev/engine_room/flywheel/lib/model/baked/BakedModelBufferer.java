@@ -144,7 +144,7 @@ final class BakedModelBufferer {
 	}
 
 	private static class ThreadLocalObjects {
-		public final FabricOriginBlockAndTintGetter level = new FabricOriginBlockAndTintGetter(p -> 0, p -> 15);
+		public final FabricOriginBlockAndTintGetter level = new FabricOriginBlockAndTintGetter(p -> 0, p -> 0);
 		public final PoseStack identityPoseStack = new PoseStack();
 		public final RandomSource random = RandomSource.createNewThreadLocalInstance();
 
