@@ -5,22 +5,18 @@ import java.lang.reflect.Field;
 import org.jetbrains.annotations.UnknownNullability;
 
 import dev.engine_room.flywheel.lib.internal.FlwLibXplat;
+import dev.engine_room.flywheel.lib.model.SimpleModel;
 import dev.engine_room.flywheel.lib.model.baked.BakedModelBuilder;
 import dev.engine_room.flywheel.lib.model.baked.BlockModelBuilder;
+import dev.engine_room.flywheel.lib.model.baked.ModelBuilderImpl;
 import dev.engine_room.flywheel.lib.model.baked.MultiBlockModelBuilder;
-import dev.engine_room.flywheel.lib.model.baked.NeoForgeBakedModelBuilder;
-import dev.engine_room.flywheel.lib.model.baked.NeoForgeBlockModelBuilder;
-import dev.engine_room.flywheel.lib.model.baked.NeoForgeMultiBlockModelBuilder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.block.ModelBlockRenderer;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.ModelManager;
 import net.minecraft.client.resources.model.ModelResourceLocation;
-import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.fml.util.ObfuscationReflectionHelper;
 
 public class FlwLibXplatImpl implements FlwLibXplat {
@@ -48,17 +44,17 @@ public class FlwLibXplatImpl implements FlwLibXplat {
 	}
 
 	@Override
-	public BakedModelBuilder createBakedModelBuilder(BakedModel bakedModel) {
-		return new NeoForgeBakedModelBuilder(bakedModel);
+	public SimpleModel buildBakedModelBuilder(BakedModelBuilder builder) {
+		return ModelBuilderImpl.buildBakedModelBuilder(builder);
 	}
 
 	@Override
-	public BlockModelBuilder createBlockModelBuilder(BlockState state) {
-		return new NeoForgeBlockModelBuilder(state);
+	public SimpleModel buildBlockModelBuilder(BlockModelBuilder builder) {
+		return ModelBuilderImpl.buildBlockModelBuilder(builder);
 	}
 
 	@Override
-	public MultiBlockModelBuilder createMultiBlockModelBuilder(BlockAndTintGetter level, Iterable<BlockPos> positions) {
-		return new NeoForgeMultiBlockModelBuilder(level, positions);
+	public SimpleModel buildMultiBlockModelBuilder(MultiBlockModelBuilder builder) {
+		return ModelBuilderImpl.buildMultiBlockModelBuilder(builder);
 	}
 }

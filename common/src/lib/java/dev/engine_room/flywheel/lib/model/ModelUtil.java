@@ -20,7 +20,7 @@ import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 
 public final class ModelUtil {
 	/**
-	 * An alternative BlockRenderDispatcher that circumvents the Forge rendering pipeline to ensure consistency.
+	 * An alternative BlockRenderDispatcher that circumvents the NeoForge rendering pipeline to ensure consistency.
 	 * Meant to be used for virtual rendering.
 	 */
 	public static final BlockRenderDispatcher VANILLA_RENDERER = FlwLibXplat.INSTANCE.createVanillaBlockRenderDispatcher();
