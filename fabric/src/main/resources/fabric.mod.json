@@ -32,7 +32,6 @@
     "fabric-api": "${fabric_api_version_range}"
   },
   "breaks": {
-    "sodium": "<0.6.0-beta.2",
-    "embeddium": "*"
+    "sodium": "<0.6.0-beta.2"
   }
 }
