@@ -12,7 +12,7 @@ import dev.engine_room.flywheel.impl.compat.EmbeddiumCompat;
 import dev.engine_room.flywheel.impl.visualization.VisualizationEventHandler;
 import dev.engine_room.flywheel.lib.model.baked.PartialModelEventHandler;
 import dev.engine_room.flywheel.lib.util.LevelAttached;
-import dev.engine_room.flywheel.lib.util.ResourceReloadCache;
+import dev.engine_room.flywheel.lib.util.RendererReloadCache;
 import dev.engine_room.flywheel.lib.util.ResourceReloadHolder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.synchronization.ArgumentTypeInfos;
@@ -111,7 +111,7 @@ public final class FlywheelForge {
 	private static void registerLibEventListeners(IEventBus forgeEventBus, IEventBus modEventBus) {
 		forgeEventBus.addListener((LevelEvent.Unload e) -> LevelAttached.invalidateLevel(e.getLevel()));
 
-		modEventBus.addListener((EndClientResourceReloadEvent e) -> ResourceReloadCache.onEndClientResourceReload());
+		modEventBus.addListener((EndClientResourceReloadEvent e) -> RendererReloadCache.onReloadLevelRenderer());
 		modEventBus.addListener((EndClientResourceReloadEvent e) -> ResourceReloadHolder.onEndClientResourceReload());
 
 		modEventBus.addListener(PartialModelEventHandler::onRegisterAdditional);

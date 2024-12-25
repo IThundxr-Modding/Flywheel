@@ -11,7 +11,7 @@ import dev.engine_room.flywheel.api.model.Mesh;
 import dev.engine_room.flywheel.lib.internal.FlwLibLink;
 import dev.engine_room.flywheel.lib.memory.MemoryBlock;
 import dev.engine_room.flywheel.lib.model.SimpleQuadMesh;
-import dev.engine_room.flywheel.lib.util.ResourceReloadCache;
+import dev.engine_room.flywheel.lib.util.RendererReloadCache;
 import dev.engine_room.flywheel.lib.vertex.PosTexNormalVertexView;
 import dev.engine_room.flywheel.lib.vertex.VertexView;
 import net.minecraft.client.Minecraft;
@@ -25,7 +25,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 public final class MeshTree {
 	private static final ThreadLocal<ThreadLocalObjects> THREAD_LOCAL_OBJECTS = ThreadLocal.withInitial(ThreadLocalObjects::new);
 	private static final PoseStack.Pose IDENTITY_POSE = new PoseStack().last();
-	private static final ResourceReloadCache<ModelLayerLocation, MeshTree> CACHE = new ResourceReloadCache<>(MeshTree::convert);
+	private static final RendererReloadCache<ModelLayerLocation, MeshTree> CACHE = new RendererReloadCache<>(MeshTree::convert);
 
 	@Nullable
 	private final Mesh mesh;
