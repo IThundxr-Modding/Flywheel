@@ -10,20 +10,13 @@ import dev.engine_room.flywheel.api.material.Material;
 import dev.engine_room.flywheel.api.model.Mesh;
 import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.api.vertex.VertexList;
-import dev.engine_room.flywheel.lib.internal.FlwLibXplat;
 import dev.engine_room.flywheel.lib.material.Materials;
 import dev.engine_room.flywheel.lib.memory.MemoryBlock;
 import dev.engine_room.flywheel.lib.vertex.PosVertexView;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.Sheets;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 
 public final class ModelUtil {
-	/**
-	 * An alternative BlockRenderDispatcher that circumvents the Forge rendering pipeline to ensure consistency.
-	 * Meant to be used for virtual rendering.
-	 */
-	public static final BlockRenderDispatcher VANILLA_RENDERER = FlwLibXplat.INSTANCE.createVanillaBlockRenderDispatcher();
 	private static final float BOUNDING_SPHERE_EPSILON = 1e-4f;
 
 	private ModelUtil() {

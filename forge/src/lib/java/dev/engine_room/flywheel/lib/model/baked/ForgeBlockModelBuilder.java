@@ -58,7 +58,7 @@ public final class ForgeBlockModelBuilder extends BlockModelBuilder {
 
 		var builder = ChunkLayerSortedListBuilder.<Model.ConfiguredMesh>getThreadLocal();
 
-		BakedModelBufferer.bufferBlock(ModelUtil.VANILLA_RENDERER, level, state, poseStack, modelData, (renderType, shaded, data) -> {
+		BakedModelBufferer.bufferBlock(level, state, poseStack, modelData, (renderType, shaded, data) -> {
 			Material material = materialFunc.apply(renderType, shaded);
 			if (material != null) {
 				Mesh mesh = MeshHelper.blockVerticesToMesh(data, "source=BlockModelBuilder," + "blockState=" + state + ",renderType=" + renderType + ",shaded=" + shaded);

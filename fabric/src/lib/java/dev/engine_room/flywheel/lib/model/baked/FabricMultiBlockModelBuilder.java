@@ -44,7 +44,7 @@ public final class FabricMultiBlockModelBuilder extends MultiBlockModelBuilder {
 
 		var builder = ChunkLayerSortedListBuilder.<Model.ConfiguredMesh>getThreadLocal();
 
-		BakedModelBufferer.bufferMultiBlock(ModelUtil.VANILLA_RENDERER, positions.iterator(), level, poseStack, renderFluids, (renderType, shaded, data) -> {
+		BakedModelBufferer.bufferMultiBlock(positions.iterator(), level, poseStack, renderFluids, (renderType, shaded, data) -> {
 			Material material = materialFunc.apply(renderType, shaded);
 			if (material != null) {
 				Mesh mesh = MeshHelper.blockVerticesToMesh(data, "source=MultiBlockModelBuilder," + "renderType=" + renderType + ",shaded=" + shaded);

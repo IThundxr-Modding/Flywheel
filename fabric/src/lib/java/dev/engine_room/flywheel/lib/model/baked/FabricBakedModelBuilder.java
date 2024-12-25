@@ -51,7 +51,7 @@ public final class FabricBakedModelBuilder extends BakedModelBuilder {
 
 		var builder = ChunkLayerSortedListBuilder.<Model.ConfiguredMesh>getThreadLocal();
 
-		BakedModelBufferer.bufferSingle(ModelUtil.VANILLA_RENDERER.getModelRenderer(), level, bakedModel, blockState, poseStack, (renderType, shaded, data) -> {
+		BakedModelBufferer.bufferSingle(level, bakedModel, blockState, poseStack, (renderType, shaded, data) -> {
 			Material material = materialFunc.apply(renderType, shaded);
 			if (material != null) {
 				Mesh mesh = MeshHelper.blockVerticesToMesh(data, "source=BakedModelBuilder," + "bakedModel=" + bakedModel + ",renderType=" + renderType + ",shaded=" + shaded);
