@@ -9,12 +9,12 @@ import java.util.function.Function;
 
 import org.jetbrains.annotations.ApiStatus;
 
-public final class ResourceReloadCache<T, U> implements Function<T, U> {
-	private static final Set<ResourceReloadCache<?, ?>> ALL = Collections.newSetFromMap(new WeakHashMap<>());
+public final class RendererReloadCache<T, U> implements Function<T, U> {
+	private static final Set<RendererReloadCache<?, ?>> ALL = Collections.newSetFromMap(new WeakHashMap<>());
 	private final Function<T, U> factory;
 	private final Map<T, U> map = new ConcurrentHashMap<>();
 
-	public ResourceReloadCache(Function<T, U> factory) {
+	public RendererReloadCache(Function<T, U> factory) {
 		this.factory = factory;
 
 		synchronized (ALL) {
@@ -36,8 +36,8 @@ public final class ResourceReloadCache<T, U> implements Function<T, U> {
 	}
 
 	@ApiStatus.Internal
-	public static void onEndClientResourceReload() {
-		for (ResourceReloadCache<?, ?> cache : ALL) {
+	public static void onReloadLevelRenderer() {
+		for (RendererReloadCache<?, ?> cache : ALL) {
 			cache.clear();
 		}
 	}

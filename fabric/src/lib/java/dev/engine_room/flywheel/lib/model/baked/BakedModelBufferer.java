@@ -9,6 +9,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceMap;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
@@ -32,7 +33,7 @@ final class BakedModelBufferer {
 	private BakedModelBufferer() {
 	}
 
-	public static void bufferSingle(ModelBlockRenderer blockRenderer, @Nullable BlockAndTintGetter level, BakedModel model, @Nullable BlockState state, @Nullable PoseStack poseStack, ResultConsumer resultConsumer) {
+	public static void bufferSingle(@Nullable BlockAndTintGetter level, BakedModel model, @Nullable BlockState state, @Nullable PoseStack poseStack, ResultConsumer resultConsumer) {
 		ThreadLocalObjects objects = THREAD_LOCAL_OBJECTS.get();
 		if (level == null) {
 			if (state == null) {
@@ -60,7 +61,10 @@ final class BakedModelBufferer {
 		model = universalEmitter.wrapModel(model);
 
 		poseStack.pushPose();
-		blockRenderer.tesselateBlock(level, model, state, BlockPos.ZERO, poseStack, universalEmitter, false, random, 42L, OverlayTexture.NO_OVERLAY);
+		Minecraft.getInstance()
+				.getBlockRenderer()
+				.getModelRenderer()
+				.tesselateBlock(level, model, state, BlockPos.ZERO, poseStack, universalEmitter, false, random, 42L, OverlayTexture.NO_OVERLAY);
 		poseStack.popPose();
 
 		universalEmitter.clear();
@@ -70,15 +74,18 @@ final class BakedModelBufferer {
 		}
 	}
 
-	public static void bufferBlock(BlockRenderDispatcher renderDispatcher, @Nullable BlockAndTintGetter level, BlockState state, @Nullable PoseStack poseStack, ResultConsumer resultConsumer) {
+	public static void bufferBlock(@Nullable BlockAndTintGetter level, BlockState state, @Nullable PoseStack poseStack, ResultConsumer resultConsumer) {
 		if (state.getRenderShape() != RenderShape.MODEL) {
 			return;
 		}
 
-		bufferSingle(renderDispatcher.getModelRenderer(), level, renderDispatcher.getBlockModel(state), state, poseStack, resultConsumer);
+		var blockModel = Minecraft.getInstance()
+				.getBlockRenderer()
+				.getBlockModel(state);
+		bufferSingle(level, blockModel, state, poseStack, resultConsumer);
 	}
 
-	public static void bufferMultiBlock(BlockRenderDispatcher renderDispatcher, Iterator<BlockPos> posIterator, BlockAndTintGetter level, @Nullable PoseStack poseStack, boolean renderFluids, ResultConsumer resultConsumer) {
+	public static void bufferMultiBlock(Iterator<BlockPos> posIterator, BlockAndTintGetter level, @Nullable PoseStack poseStack, boolean renderFluids, ResultConsumer resultConsumer) {
 		ThreadLocalObjects objects = THREAD_LOCAL_OBJECTS.get();
 		if (poseStack == null) {
 			poseStack = objects.identityPoseStack;
@@ -92,6 +99,9 @@ final class BakedModelBufferer {
 		for (MeshEmitter emitter : emitters) {
 			emitter.prepare(resultConsumer);
 		}
+
+		BlockRenderDispatcher renderDispatcher = Minecraft.getInstance()
+				.getBlockRenderer();
 
 		ModelBlockRenderer blockRenderer = renderDispatcher.getModelRenderer();
 		ModelBlockRenderer.enableCaching();

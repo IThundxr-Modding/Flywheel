@@ -8,8 +8,6 @@ import dev.engine_room.flywheel.lib.model.baked.BakedModelBuilder;
 import dev.engine_room.flywheel.lib.model.baked.BlockModelBuilder;
 import dev.engine_room.flywheel.lib.model.baked.ModelBuilderImpl;
 import dev.engine_room.flywheel.lib.model.baked.MultiBlockModelBuilder;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.ModelManager;
 import net.minecraft.resources.ResourceLocation;
@@ -19,11 +17,6 @@ public class FlwLibXplatImpl implements FlwLibXplat {
 	@UnknownNullability
 	public BakedModel getBakedModel(ModelManager modelManager, ResourceLocation location) {
 		return modelManager.getModel(location);
-	}
-
-	@Override
-	public BlockRenderDispatcher createVanillaBlockRenderDispatcher() {
-		return Minecraft.getInstance().getBlockRenderer();
 	}
 
 	@Override

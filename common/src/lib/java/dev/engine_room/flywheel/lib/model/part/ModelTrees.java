@@ -12,12 +12,12 @@ import dev.engine_room.flywheel.api.model.Mesh;
 import dev.engine_room.flywheel.api.model.Model;
 import dev.engine_room.flywheel.lib.model.RetexturedMesh;
 import dev.engine_room.flywheel.lib.model.SingleMeshModel;
-import dev.engine_room.flywheel.lib.util.ResourceReloadCache;
+import dev.engine_room.flywheel.lib.util.RendererReloadCache;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 
 public final class ModelTrees {
-	private static final ResourceReloadCache<ModelTreeKey, ModelTree> CACHE = new ResourceReloadCache<>(k -> {
+	private static final RendererReloadCache<ModelTreeKey, ModelTree> CACHE = new RendererReloadCache<>(k -> {
 		ModelTree tree = convert("", MeshTree.of(k.layer), k.pathsToPrune, k.texture != null ? k.texture.sprite() : null, k.material);
 
 		if (tree == null) {
