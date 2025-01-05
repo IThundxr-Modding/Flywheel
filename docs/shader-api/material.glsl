@@ -19,6 +19,10 @@ const uint FLW_MAT_WRITE_MASK_COLOR_DEPTH = 0u;
 const uint FLW_MAT_WRITE_MASK_COLOR = 1u;
 const uint FLW_MAT_WRITE_MASK_DEPTH = 2u;
 
+const uint FLW_MAT_CARDINAL_LIGHTING_MODE_OFF = 0u;
+const uint FLW_MAT_CARDINAL_LIGHTING_MODE_CHUNK = 1u;
+const uint FLW_MAT_CARDINAL_LIGHTING_MODE_ENTITY = 2u;
+
 struct FlwMaterial {
     bool blur;
     bool mipmap;
@@ -29,5 +33,5 @@ struct FlwMaterial {
     uint writeMask;
     bool useOverlay;
     bool useLight;
-    bool diffuse;
+    uint cardinalLightingMode;
 };
