@@ -79,7 +79,7 @@ public class NeoForgeFlwConfig implements FlwConfig {
 		public final ModConfigSpec.BooleanValue limitUpdates;
 		public final ModConfigSpec.IntValue workerThreads;
 
-		public final ForgeBackendConfig backendConfig;
+		public final NeoForgeBackendConfig backendConfig;
 
 		private ClientConfig(ModConfigSpec.Builder builder) {
 			backend = builder.comment("Select the backend to use.")
@@ -95,14 +95,14 @@ public class NeoForgeFlwConfig implements FlwConfig {
 			builder.comment("Config options for Flywheel's built-in backends.")
 					.push("flw_backends");
 
-			backendConfig = new ForgeBackendConfig(builder);
+			backendConfig = new NeoForgeBackendConfig(builder);
 		}
 	}
 
-	public static class ForgeBackendConfig implements BackendConfig {
+	public static class NeoForgeBackendConfig implements BackendConfig {
 		public final ModConfigSpec.EnumValue<LightSmoothness> lightSmoothness;
 
-		public ForgeBackendConfig(ModConfigSpec.Builder builder) {
+		public NeoForgeBackendConfig(ModConfigSpec.Builder builder) {
 			lightSmoothness = builder.comment("How smooth flywheel's shader-based lighting should be. May have a large performance impact.")
 					.defineEnum("lightSmoothness", LightSmoothness.SMOOTH);
 		}
