@@ -100,34 +100,6 @@ public final class FlwCommands {
 							return Command.SINGLE_SUCCESS;
 						})));
 
-		command.then(ClientCommandManager.literal("useLightDirections")
-				.executes(context -> {
-					if (FabricFlwConfig.INSTANCE.backendConfig.useLightDirections) {
-						context.getSource()
-								.sendFeedback(Component.translatable("command.flywheel.use_light_directions.get.on"));
-					} else {
-						context.getSource()
-								.sendFeedback(Component.translatable("command.flywheel.use_light_directions.get.off"));
-					}
-					return Command.SINGLE_SUCCESS;
-				})
-				.then(ClientCommandManager.literal("on")
-						.executes(context -> {
-							FabricFlwConfig.INSTANCE.backendConfig.useLightDirections = true;
-							FabricFlwConfig.INSTANCE.save();
-							context.getSource()
-									.sendFeedback(Component.translatable("command.flywheel.use_light_directions.set.on"));
-							return Command.SINGLE_SUCCESS;
-						}))
-				.then(ClientCommandManager.literal("off")
-						.executes(context -> {
-							FabricFlwConfig.INSTANCE.backendConfig.useLightDirections = false;
-							FabricFlwConfig.INSTANCE.save();
-							context.getSource()
-									.sendFeedback(Component.translatable("command.flywheel.use_light_directions.set.off"));
-							return Command.SINGLE_SUCCESS;
-						})));
-
 		command.then(createDebugCommand());
 
 		dispatcher.register(command);

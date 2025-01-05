@@ -98,29 +98,6 @@ public final class FlwCommands {
 							return Command.SINGLE_SUCCESS;
 						})));
 
-		var useLightDirectionsValue = NeoForgeFlwConfig.INSTANCE.client.backendConfig.useLightDirections;
-		command.then(Commands.literal("useLightDirections")
-				.executes(context -> {
-					if (useLightDirectionsValue.get()) {
-						sendMessage(context.getSource(), Component.translatable("command.flywheel.use_light_directions.get.on"));
-					} else {
-						sendMessage(context.getSource(), Component.translatable("command.flywheel.use_light_directions.get.off"));
-					}
-					return Command.SINGLE_SUCCESS;
-				})
-				.then(Commands.literal("on")
-						.executes(context -> {
-							useLightDirectionsValue.set(true);
-							sendMessage(context.getSource(), Component.translatable("command.flywheel.use_light_directions.set.on"));
-							return Command.SINGLE_SUCCESS;
-						}))
-				.then(Commands.literal("off")
-						.executes(context -> {
-							useLightDirectionsValue.set(false);
-							sendMessage(context.getSource(), Component.translatable("command.flywheel.use_light_directions.set.off"));
-							return Command.SINGLE_SUCCESS;
-						})));
-
 		command.then(createDebugCommand());
 
 		event.getDispatcher().register(command);

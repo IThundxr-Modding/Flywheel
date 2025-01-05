@@ -1,5 +1,6 @@
 package dev.engine_room.flywheel.lib.material;
 
+import dev.engine_room.flywheel.api.material.CardinalLightingMode;
 import dev.engine_room.flywheel.api.material.CutoutShader;
 import dev.engine_room.flywheel.api.material.DepthTest;
 import dev.engine_room.flywheel.api.material.FogShader;
@@ -29,7 +30,7 @@ public class SimpleMaterial implements Material {
 
 	protected final boolean useOverlay;
 	protected final boolean useLight;
-	protected final boolean diffuse;
+	protected final CardinalLightingMode cardinalLightingMode;
 
 	protected SimpleMaterial(Builder builder) {
 		shaders = builder.shaders();
@@ -46,7 +47,7 @@ public class SimpleMaterial implements Material {
 		writeMask = builder.writeMask();
 		useOverlay = builder.useOverlay();
 		useLight = builder.useLight();
-		diffuse = builder.diffuse();
+		cardinalLightingMode = builder.cardinalLightingMode();
 	}
 
 	public static Builder builder() {
@@ -128,8 +129,8 @@ public class SimpleMaterial implements Material {
 	}
 
 	@Override
-	public boolean diffuse() {
-		return diffuse;
+	public CardinalLightingMode cardinalLightingMode() {
+		return cardinalLightingMode;
 	}
 
 	public static class Builder implements Material {
@@ -150,7 +151,7 @@ public class SimpleMaterial implements Material {
 
 		protected boolean useOverlay;
 		protected boolean useLight;
-		protected boolean diffuse;
+		protected CardinalLightingMode cardinalLightingMode;
 
 		public Builder() {
 			shaders = StandardMaterialShaders.DEFAULT;
@@ -167,7 +168,7 @@ public class SimpleMaterial implements Material {
 			writeMask = WriteMask.COLOR_DEPTH;
 			useOverlay = true;
 			useLight = true;
-			diffuse = true;
+			cardinalLightingMode = CardinalLightingMode.ENTITY;
 		}
 
 		public Builder(Material material) {
@@ -189,7 +190,7 @@ public class SimpleMaterial implements Material {
 			writeMask = material.writeMask();
 			useOverlay = material.useOverlay();
 			useLight = material.useLight();
-			diffuse = material.diffuse();
+			cardinalLightingMode = material.cardinalLightingMode();
 			return this;
 		}
 
@@ -264,7 +265,11 @@ public class SimpleMaterial implements Material {
 		}
 
 		public Builder diffuse(boolean value) {
-			this.diffuse = value;
+			return cardinalLightingMode(value ? CardinalLightingMode.ENTITY : CardinalLightingMode.OFF);
+		}
+
+		public Builder cardinalLightingMode(CardinalLightingMode value) {
+			this.cardinalLightingMode = value;
 			return this;
 		}
 
@@ -339,8 +344,8 @@ public class SimpleMaterial implements Material {
 		}
 
 		@Override
-		public boolean diffuse() {
-			return diffuse;
+		public CardinalLightingMode cardinalLightingMode() {
+			return cardinalLightingMode;
 		}
 
 		public SimpleMaterial build() {

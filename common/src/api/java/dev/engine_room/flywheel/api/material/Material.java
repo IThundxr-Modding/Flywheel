@@ -47,9 +47,9 @@ public interface Material {
 	boolean useLight();
 
 	/**
-	 * Should this material be rendered with diffuse lighting?
+	 * How should this material receive cardinal lighting?
 	 *
-	 * @return {@code true} if this material should be rendered with diffuse lighting.
+	 * @return The cardinal lighting mode.
 	 */
-	boolean diffuse();
+	CardinalLightingMode cardinalLightingMode();
 }
