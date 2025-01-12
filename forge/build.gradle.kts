@@ -54,6 +54,8 @@ platform {
 
 jarSets {
     mainSet.publish(platform.modArtifactId)
+    mainSet.outgoing("flywheel")
+
     create("api", api, lib).apply {
         addToAssemble()
         publish(platform.apiArtifactId)
@@ -65,13 +67,6 @@ jarSets {
         }
     }
 }
-
-val config = project.configurations.register("flywheelForge") {
-    isCanBeConsumed = true
-    isCanBeResolved = false
-}
-
-project.artifacts.add(config.name, jarSets.mainSet.remapJar)
 
 defaultPackageInfos {
     sources(api, lib, backend, main)

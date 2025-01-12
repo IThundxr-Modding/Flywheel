@@ -134,7 +134,6 @@ open class PlatformExtension(val project: Project) {
 
         override fun setValue(thisRef: Any?, property: KProperty<*>, value: Project) {
             this.value = value
-            thisProject.evaluationDependsOn(value.path)
         }
 
         override fun toString(): String =

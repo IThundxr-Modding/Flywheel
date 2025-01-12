@@ -41,6 +41,29 @@ class JarTaskSet(
         }
     }
 
+    fun outgoing(name: String) {
+        outgoingRemapJar("${name}Remap")
+        outgoingJar("${name}Dev")
+    }
+
+    fun outgoingRemapJar(name: String) {
+        val config = project.configurations.register(name) {
+            isCanBeConsumed = true
+            isCanBeResolved = false
+        }
+
+        project.artifacts.add(config.name, remapJar)
+    }
+
+    fun outgoingJar(name: String) {
+        val config = project.configurations.register(name) {
+            isCanBeConsumed = true
+            isCanBeResolved = false
+        }
+
+        project.artifacts.add(config.name, jar)
+    }
+
     /**
      * Configure the assemble task to depend on the remap tasks and javadoc jar.
      */

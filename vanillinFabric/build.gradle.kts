@@ -73,6 +73,6 @@ dependencies {
     compileOnly(project(path = ":common", configuration = "vanillinResources"))
 
     // JiJ flywheel proper
-    include(project(path = ":fabric", configuration = "flywheelFabric"))
-    modRuntimeOnly(project(path = ":fabric", configuration = "flywheelFabric"))
+    include(project(path = ":fabric", configuration = "flywheelRemap"))
+    runtimeOnly(project(path = ":fabric", configuration = "flywheelDev"))
 }
