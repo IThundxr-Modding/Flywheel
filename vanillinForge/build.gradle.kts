@@ -10,7 +10,7 @@ plugins {
     id("flywheel.platform")
 }
 
-group = "dev.engine_room.vanillin"
+subproject.init(property("vanillin_group") as String, property("vanillin_version") as String)
 
 val main = sourceSets.getByName("main")
 
@@ -80,7 +80,10 @@ dependencies {
 
     modCompileOnly("maven.modrinth:embeddium:${property("embeddium_version")}")
 
-    compileOnly(project(path = ":common", configuration = "commonVanillin"))
+    compileOnly(project(path = ":common", configuration = "vanillinClasses"))
+    compileOnly(project(path = ":common", configuration = "vanillinResources"))
+
+    // JiJ flywheel proper
     include(project(path = ":forge", configuration = "flywheelForge"))
     modRuntimeOnly(project(path = ":forge", configuration = "flywheelForge"))
 }

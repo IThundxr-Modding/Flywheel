@@ -5,34 +5,34 @@ license = "${mod_license}"
 issueTrackerURL = "${mod_issues}"
 
 [[mods]]
-modId = "${mod_id}"
-version = "${mod_version}"
-displayName = "${mod_name}"
-description = "${mod_description}"
+modId = "${flywheel_id}"
+version = "${flywheel_version}"
+displayName = "${flywheel_name}"
+description = "${flywheel_description}"
 logoFile = "logo.png"
 authors = "Jozufozu, PepperCode1"
 displayURL = "${mod_homepage}"
 displayTest = "IGNORE_ALL_VERSION"
 
-[[dependencies.${mod_id}]]
+[[dependencies.${ flywheel_id }]]
 modId = "minecraft"
 mandatory = true
 versionRange = "${minecraft_maven_version_range}"
 side = "CLIENT"
 
-[[dependencies.${mod_id}]]
+[[dependencies.${ flywheel_id }]]
 modId = "forge"
 mandatory = true
 versionRange = "${forge_version_range}"
 side = "CLIENT"
 
-[[dependencies.${mod_id}]]
+[[dependencies.${ flywheel_id }]]
 modId = "embeddium"
 mandatory = false
 versionRange = "[0.3.25,)"
 side = "CLIENT"
 
-[[dependencies.${mod_id}]]
+[[dependencies.${ flywheel_id }]]
 modId = "sodium"
 mandatory = false
 versionRange = "[0.6.0-beta.2,)"

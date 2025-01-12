@@ -42,18 +42,6 @@ class JarTaskSet(
     }
 
     /**
-     * Create a new configuration that can be consumed by other projects, and export the base jar.
-     */
-    fun createOutgoingConfiguration() {
-        val config = project.configurations.register(name) {
-            isCanBeConsumed = true
-            isCanBeResolved = false
-        }
-
-        project.artifacts.add(config.name, jar)
-    }
-
-    /**
      * Configure the assemble task to depend on the remap tasks and javadoc jar.
      */
     fun addToAssemble() {

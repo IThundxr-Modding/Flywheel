@@ -10,7 +10,7 @@ plugins {
     id("flywheel.platform")
 }
 
-group = "dev.engine_room.vanillin"
+subproject.init(property("vanillin_group") as String, property("vanillin_version") as String)
 
 val main = sourceSets.getByName("main")
 
@@ -69,7 +69,10 @@ dependencies {
 
     modCompileOnly("maven.modrinth:sodium:${property("sodium_version")}")
 
-    compileOnly(project(path = ":common", configuration = "commonVanillin"))
+    compileOnly(project(path = ":common", configuration = "vanillinClasses"))
+    compileOnly(project(path = ":common", configuration = "vanillinResources"))
+
+    // JiJ flywheel proper
     include(project(path = ":fabric", configuration = "flywheelFabric"))
     modRuntimeOnly(project(path = ":fabric", configuration = "flywheelFabric"))
 }

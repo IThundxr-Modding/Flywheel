@@ -7,6 +7,8 @@ plugins {
     id("flywheel.platform")
 }
 
+subproject.init(property("flywheel_group") as String, property("flywheel_version") as String)
+
 val api = sourceSets.create("api")
 val lib = sourceSets.create("lib")
 val backend = sourceSets.create("backend")
@@ -91,9 +93,13 @@ dependencies {
 
     modCompileOnly("maven.modrinth:sodium:${property("sodium_version")}")
 
-    "forApi"(project(path = ":common", configuration = "commonApiOnly"))
-    "forLib"(project(path = ":common", configuration = "commonLib"))
-    "forBackend"(project(path = ":common", configuration = "commonBackend"))
-    "forStubs"(project(path = ":common", configuration = "commonStubs"))
-    "forMain"(project(path = ":common", configuration = "commonImpl"))
+    "forApi"(project(path = ":common", configuration = "apiClasses"))
+    "forLib"(project(path = ":common", configuration = "libClasses"))
+    "forBackend"(project(path = ":common", configuration = "backendClasses"))
+    "forStubs"(project(path = ":common", configuration = "stubsClasses"))
+    "forMain"(project(path = ":common", configuration = "mainClasses"))
+
+    "forLib"(project(path = ":common", configuration = "libResources"))
+    "forBackend"(project(path = ":common", configuration = "backendResources"))
+    "forMain"(project(path = ":common", configuration = "mainResources"))
 }

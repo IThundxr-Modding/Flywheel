@@ -6,6 +6,8 @@ plugins {
     id("flywheel.subproject")
 }
 
+subproject.init(property("flywheel_group") as String, property("flywheel_version") as String)
+
 val api = sourceSets.create("api")
 val lib = sourceSets.create("lib")
 val backend = sourceSets.create("backend")
@@ -18,20 +20,25 @@ transitiveSourceSets {
 
     sourceSet(api) {
         rootCompile()
+        outgoingClasses()
     }
     sourceSet(lib) {
         rootCompile()
         compile(api)
+        outgoing()
     }
     sourceSet(backend) {
         rootCompile()
         compile(api, lib)
+        outgoing()
     }
     sourceSet(stubs) {
         rootCompile()
+        outgoingClasses()
     }
     sourceSet(main) {
         compile(api, lib, backend, stubs)
+        outgoing()
     }
     sourceSet(sourceSets.getByName("test")) {
         implementation(api, lib, backend)
@@ -39,6 +46,7 @@ transitiveSourceSets {
     sourceSet(vanillin) {
         rootCompile()
         compile(api, lib)
+        outgoing()
     }
 }
 
@@ -47,14 +55,6 @@ defaultPackageInfos {
 }
 
 jarSets {
-    // For sharing with other subprojects.
-    outgoing("commonApiOnly", api)
-    outgoing("commonLib", lib)
-    outgoing("commonBackend", backend)
-    outgoing("commonStubs", stubs)
-    outgoing("commonImpl", main)
-    outgoing("commonVanillin", vanillin)
-
     // For publishing.
     create("api", api, lib).apply {
         addToAssemble()

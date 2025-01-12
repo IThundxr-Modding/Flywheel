@@ -27,7 +27,7 @@ versionRange = "${forge_version_range}"
 side = "CLIENT"
 
 [[dependencies.${ vanillin_id }]]
-modId = "${mod_id}"
+modId = "${flywheel_id}"
 mandatory = true
 versionRange = "${flywheel_maven_version_range}"
 side = "CLIENT"
