@@ -1,4 +1,4 @@
-package dev.engine_room.flywheel.vanilla;
+package dev.engine_room.vanillin.visuals;
 
 import static dev.engine_room.flywheel.lib.visualization.SimpleBlockEntityVisualizer.builder;
 import static dev.engine_room.flywheel.lib.visualization.SimpleEntityVisualizer.builder;

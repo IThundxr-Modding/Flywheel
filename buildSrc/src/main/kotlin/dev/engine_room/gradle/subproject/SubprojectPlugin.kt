@@ -181,5 +181,11 @@ val processResourcesExpandProperties = listOf(
     "minecraft_maven_version_range",
     "fabric_api_version_range",
     "forge_version_range",
+    "vanillin_id",
+    "vanillin_name",
+    "vanillin_version",
+    "vanillin_description",
+    "flywheel_maven_version_range",
+    "flywheel_semver_version_range",
 )
 

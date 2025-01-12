@@ -23,7 +23,7 @@ open class PlatformExtension(val project: Project) {
 
     var apiArtifactId: String = "flywheel-${project.name}-api-${project.property("artifact_minecraft_version")}"
 
-    private val commonSourceSets: SourceSetContainer by lazy { commonProject.the<SourceSetContainer>() }
+    val commonSourceSets: SourceSetContainer by lazy { commonProject.the<SourceSetContainer>() }
 
     fun setupLoomMod(vararg sourceSets: SourceSet) {
         project.the<LoomGradleExtensionAPI>().mods.maybeCreate("main").apply {

@@ -11,6 +11,7 @@ val lib = sourceSets.create("lib")
 val backend = sourceSets.create("backend")
 val stubs = sourceSets.create("stubs")
 val main = sourceSets.getByName("main")
+val vanillin = sourceSets.create("vanillin")
 
 transitiveSourceSets {
     compileClasspath = main.compileClasspath
@@ -35,10 +36,14 @@ transitiveSourceSets {
     sourceSet(sourceSets.getByName("test")) {
         implementation(api, lib, backend)
     }
+    sourceSet(vanillin) {
+        rootCompile()
+        compile(api, lib)
+    }
 }
 
 defaultPackageInfos {
-    sources(api, lib, backend, main)
+    sources(api, lib, backend, main, vanillin)
 }
 
 jarSets {
@@ -48,6 +53,7 @@ jarSets {
     outgoing("commonBackend", backend)
     outgoing("commonStubs", stubs)
     outgoing("commonImpl", main)
+    outgoing("commonVanillin", vanillin)
 
     // For publishing.
     create("api", api, lib).apply {

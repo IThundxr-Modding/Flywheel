@@ -1,4 +1,4 @@
-package dev.engine_room.flywheel.vanilla;
+package dev.engine_room.vanillin.visuals;
 
 import java.util.Calendar;
 import java.util.EnumMap;

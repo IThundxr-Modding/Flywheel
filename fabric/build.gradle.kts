@@ -66,6 +66,13 @@ jarSets {
     }
 }
 
+val config = project.configurations.register("flywheelFabric") {
+    isCanBeConsumed = true
+    isCanBeResolved = false
+}
+
+project.artifacts.add(config.name, jarSets.mainSet.remapJar)
+
 defaultPackageInfos {
     sources(api, lib, backend, main)
 }
