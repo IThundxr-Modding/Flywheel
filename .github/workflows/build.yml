@@ -69,9 +69,11 @@ jobs:
           echo "FABRIC_API_VERSION=$(grep '^fabric_api_version =' gradle.properties | cut -d'=' -f2 | tr -d ' ' | sed 's/+.*//')" >> "$GITHUB_ENV"
 
       - name: Move Test Mod and Flywheel into run/mods
+        # We don't want to recreate the jar name formatting so glob everything over then remove the sources and javadoc jars
         run: |
           mkdir -p run/mods
           cp ${{ matrix.loader }}/build/libs/*.jar run/mods
+          rm -f run/mods/*-sources.jar run/mods/*-javadoc.jar
 
       # Lock to a specific commit, it would be bad if the tag is re-pushed with unwanted changes
       - name: Run the MC client
