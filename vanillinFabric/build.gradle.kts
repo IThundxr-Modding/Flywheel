@@ -1,6 +1,3 @@
-import dev.engine_room.gradle.jarset.JarTaskSet
-import org.gradle.jvm.tasks.Jar
-
 plugins {
     idea
     java
@@ -10,41 +7,23 @@ plugins {
     id("flywheel.platform")
 }
 
+val common = ":common"
+val platform = ":fabric"
+
 subproject.init("vanillin-fabric", "vanillin_group", "vanillin_version")
 
 val main = sourceSets.getByName("main")
 
 platform {
-    commonProject = project(":common")
     setupLoomRuns()
 }
 
-listOf("api", "lib")
-    .map { project(":fabric").sourceSets.named(it).get() }
-    .forEach { main.compileClasspath += it.output }
+transitiveSourceSets {
+    sourceSet(main) {
+        compileClasspath(project(platform), "api", "lib")
 
-val commonSourceSet = platform.commonSourceSets.named("vanillin").get()
-
-tasks.named<Javadoc>("javadoc").configure {
-    source(commonSourceSet.allJava)
-
-    JarTaskSet.excludeDuplicatePackageInfos(this)
-}
-
-tasks.named<Jar>("sourcesJar").configure {
-    from(commonSourceSet.allJava)
-
-    JarTaskSet.excludeDuplicatePackageInfos(this)
-}
-
-tasks.withType<JavaCompile>().configureEach {
-    JarTaskSet.excludeDuplicatePackageInfos(this)
-}
-tasks.named<JavaCompile>(main.compileJavaTaskName).configure {
-    source(commonSourceSet.allJava)
-}
-tasks.named<ProcessResources>(main.processResourcesTaskName).configure {
-    from(commonSourceSet.resources)
+        bundleFrom(project(common), "vanillin")
+    }
 }
 
 jarSets {
@@ -68,10 +47,10 @@ dependencies {
 
     modCompileOnly("maven.modrinth:sodium:${property("sodium_version")}")
 
-    compileOnly(project(path = ":common", configuration = "vanillinClasses"))
-    compileOnly(project(path = ":common", configuration = "vanillinResources"))
+    compileOnly(project(path = common, configuration = "vanillinClasses"))
+    compileOnly(project(path = common, configuration = "vanillinResources"))
 
     // JiJ flywheel proper
-    include(project(path = ":fabric", configuration = "flywheelRemap"))
-    runtimeOnly(project(path = ":fabric", configuration = "flywheelDev"))
+    include(project(path = platform, configuration = "flywheelRemap"))
+    runtimeOnly(project(path = platform, configuration = "flywheelDev"))
 }

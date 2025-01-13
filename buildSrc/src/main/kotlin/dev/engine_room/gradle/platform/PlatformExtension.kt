@@ -1,25 +1,18 @@
 package dev.engine_room.gradle.platform
 
-import dev.engine_room.gradle.jarset.JarTaskSet
 import net.fabricmc.loom.api.LoomGradleExtensionAPI
 import net.fabricmc.loom.task.RemapJarTask
 import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.tasks.SourceSet
-import org.gradle.api.tasks.SourceSetContainer
-import org.gradle.api.tasks.compile.JavaCompile
-import org.gradle.api.tasks.javadoc.Javadoc
 import org.gradle.jvm.tasks.Jar
-import org.gradle.kotlin.dsl.*
-import org.gradle.language.jvm.tasks.ProcessResources
+import org.gradle.kotlin.dsl.assign
+import org.gradle.kotlin.dsl.named
+import org.gradle.kotlin.dsl.register
+import org.gradle.kotlin.dsl.the
 import java.io.File
-import kotlin.properties.Delegates
 
 open class PlatformExtension(val project: Project) {
-    var commonProject: Project by Delegates.notNull()
-
-    val commonSourceSets: SourceSetContainer by lazy { commonProject.the<SourceSetContainer>() }
-
     fun setupLoomMod(vararg sourceSets: SourceSet) {
         project.the<LoomGradleExtensionAPI>().mods.maybeCreate("main").apply {
             sourceSets.forEach(::sourceSet)
@@ -47,52 +40,6 @@ open class PlatformExtension(val project: Project) {
             named("server") {
                 isIdeConfigGenerated = true
                 programArgs("--nogui")
-            }
-        }
-    }
-
-    fun compileWithCommonSourceSets(vararg sourceSets: SourceSet) {
-        project.tasks.apply {
-            withType<JavaCompile>().configureEach {
-                JarTaskSet.excludeDuplicatePackageInfos(this)
-            }
-
-            sourceSets.forEach {
-                val commonSourceSet = commonSourceSets.named(it.name).get()
-
-                named<JavaCompile>(it.compileJavaTaskName).configure {
-                    source(commonSourceSet.allJava)
-                }
-                named<ProcessResources>(it.processResourcesTaskName).configure {
-                    from(commonSourceSet.resources)
-                }
-            }
-        }
-    }
-
-    fun setupFatJar(vararg sourceSets: SourceSet) {
-        project.tasks.apply {
-            val extraSourceSets = sourceSets.filter { it.name != "main" }.toList()
-            val commonSources = sourceSets.map { commonSourceSets.named(it.name).get() }
-
-            named<Jar>("jar").configure {
-                extraSourceSets.forEach { from(it.output) }
-
-                JarTaskSet.excludeDuplicatePackageInfos(this)
-            }
-
-            named<Javadoc>("javadoc").configure {
-                commonSources.forEach { source(it.allJava) }
-                extraSourceSets.forEach { source(it.allJava) }
-
-                JarTaskSet.excludeDuplicatePackageInfos(this)
-            }
-
-            named<Jar>("sourcesJar").configure {
-                commonSources.forEach { from(it.allJava) }
-                extraSourceSets.forEach { from(it.allJava) }
-
-                JarTaskSet.excludeDuplicatePackageInfos(this)
             }
         }
     }

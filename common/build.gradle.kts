@@ -24,12 +24,12 @@ transitiveSourceSets {
     }
     sourceSet(lib) {
         rootCompile()
-        compile(api)
+        compileClasspath(api)
         outgoing()
     }
     sourceSet(backend) {
         rootCompile()
-        compile(api, lib)
+        compileClasspath(api, lib)
         outgoing()
     }
     sourceSet(stubs) {
@@ -37,7 +37,7 @@ transitiveSourceSets {
         outgoingClasses()
     }
     sourceSet(main) {
-        compile(api, lib, backend, stubs)
+        compileClasspath(api, lib, backend, stubs)
         outgoing()
     }
     sourceSet(sourceSets.getByName("test")) {
@@ -45,7 +45,7 @@ transitiveSourceSets {
     }
     sourceSet(vanillin) {
         rootCompile()
-        compile(api, lib)
+        compileClasspath(api, lib)
         outgoing()
     }
 }

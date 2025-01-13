@@ -7,6 +7,9 @@ plugins {
     id("flywheel.platform")
 }
 
+val common = ":common"
+val commonProject = project(common)
+
 subproject.init("flywheel-fabric", "flywheel_group", "flywheel_version")
 
 val api = sourceSets.create("api")
@@ -21,22 +24,34 @@ transitiveSourceSets {
 
     sourceSet(api) {
         rootCompile()
+
+        from(commonProject)
     }
     sourceSet(lib) {
         rootCompile()
-        compile(api)
+        compileClasspath(api)
+
+        from(commonProject)
     }
     sourceSet(backend) {
         rootCompile()
-        compile(api, lib)
+        compileClasspath(api, lib)
+
+        from(commonProject)
     }
     sourceSet(stubs) {
         rootCompile()
+
+        from(commonProject)
     }
     sourceSet(main) {
         // Don't want stubs at runtime
-        compile(stubs)
+        compileClasspath(stubs)
         implementation(api, lib, backend)
+
+        bundleFrom(commonProject)
+
+        bundleOutput(api, lib, backend)
     }
     sourceSet(testMod) {
         rootCompile()
@@ -46,11 +61,8 @@ transitiveSourceSets {
 }
 
 platform {
-    commonProject = project(":common")
-    compileWithCommonSourceSets(api, lib, backend, stubs, main)
     setupLoomMod(api, lib, backend, main)
     setupLoomRuns()
-    setupFatJar(api, lib, backend, main)
     setupTestMod(testMod)
 }
 
@@ -88,13 +100,13 @@ dependencies {
 
     modCompileOnly("maven.modrinth:sodium:${property("sodium_version")}")
 
-    "forApi"(project(path = ":common", configuration = "apiClasses"))
-    "forLib"(project(path = ":common", configuration = "libClasses"))
-    "forBackend"(project(path = ":common", configuration = "backendClasses"))
-    "forStubs"(project(path = ":common", configuration = "stubsClasses"))
-    "forMain"(project(path = ":common", configuration = "mainClasses"))
+    "forApi"(project(path = common, configuration = "apiClasses"))
+    "forLib"(project(path = common, configuration = "libClasses"))
+    "forBackend"(project(path = common, configuration = "backendClasses"))
+    "forStubs"(project(path = common, configuration = "stubsClasses"))
+    "forMain"(project(path = common, configuration = "mainClasses"))
 
-    "forLib"(project(path = ":common", configuration = "libResources"))
-    "forBackend"(project(path = ":common", configuration = "backendResources"))
-    "forMain"(project(path = ":common", configuration = "mainResources"))
+    "forLib"(project(path = common, configuration = "libResources"))
+    "forBackend"(project(path = common, configuration = "backendResources"))
+    "forMain"(project(path = common, configuration = "mainResources"))
 }
