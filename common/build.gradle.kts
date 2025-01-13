@@ -6,7 +6,7 @@ plugins {
     id("flywheel.subproject")
 }
 
-subproject.init(property("flywheel_group") as String, property("flywheel_version") as String)
+subproject.init("flywheel-common", "flywheel_group", "flywheel_version")
 
 val api = sourceSets.create("api")
 val lib = sourceSets.create("lib")

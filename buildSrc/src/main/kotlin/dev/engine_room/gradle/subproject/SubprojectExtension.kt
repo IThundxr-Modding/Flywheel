@@ -16,8 +16,8 @@ import org.gradle.kotlin.dsl.*
 import org.gradle.language.jvm.tasks.ProcessResources
 
 open class SubprojectExtension(val project: Project) {
-    fun init(group: String, version: String) {
-        setBaseProperties(group, version)
+    fun init(archiveBase: String, group: String, version: String) {
+        setBaseProperties(archiveBase, group, version)
         setupJava()
         addRepositories()
         setupLoom()
@@ -26,17 +26,17 @@ open class SubprojectExtension(val project: Project) {
         setupPublishing()
     }
 
-    private fun setBaseProperties(group: String, version: String) {
+    private fun setBaseProperties(archiveBase: String, group: String, version: String) {
         val dev = System.getenv("RELEASE")?.contentEquals("false", true) ?: true
         val buildNumber = System.getenv("BUILD_NUMBER")
 
         val versionSuffix = if (dev && buildNumber != null) "-${buildNumber}" else ""
 
-        project.group = group
-        project.version = "${version}${versionSuffix}"
+        project.group = project.property(group) as String
+        project.version = "${project.property(version)}${versionSuffix}"
 
         project.the<BasePluginExtension>().apply {
-            archivesName = "flywheel-${project.name}-${project.property("artifact_minecraft_version")}"
+            archivesName = "${archiveBase}-${project.property("artifact_minecraft_version")}"
         }
     }
 

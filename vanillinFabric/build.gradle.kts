@@ -10,12 +10,11 @@ plugins {
     id("flywheel.platform")
 }
 
-subproject.init(property("vanillin_group") as String, property("vanillin_version") as String)
+subproject.init("vanillin-fabric", "vanillin_group", "vanillin_version")
 
 val main = sourceSets.getByName("main")
 
 platform {
-    modArtifactId = "vanillin-fabric-${project.property("artifact_minecraft_version")}"
     commonProject = project(":common")
     setupLoomRuns()
 }
@@ -49,7 +48,7 @@ tasks.named<ProcessResources>(main.processResourcesTaskName).configure {
 }
 
 jarSets {
-    mainSet.publish(platform.modArtifactId)
+    mainSet.publish("vanillin-fabric-${project.property("artifact_minecraft_version")}")
 }
 
 defaultPackageInfos {

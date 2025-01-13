@@ -7,7 +7,7 @@ plugins {
     id("flywheel.platform")
 }
 
-subproject.init(property("flywheel_group") as String, property("flywheel_version") as String)
+subproject.init("flywheel-fabric", "flywheel_group", "flywheel_version")
 
 val api = sourceSets.create("api")
 val lib = sourceSets.create("lib")
@@ -55,12 +55,12 @@ platform {
 }
 
 jarSets {
-    mainSet.publish(platform.modArtifactId)
+    mainSet.publish("flywheel-fabric-${project.property("artifact_minecraft_version")}")
     mainSet.outgoing("flywheel")
 
     create("api", api, lib).apply {
         addToAssemble()
-        publish(platform.apiArtifactId)
+        publish("flywheel-fabric-api-${project.property("artifact_minecraft_version")}")
 
         configureJar {
             manifest {

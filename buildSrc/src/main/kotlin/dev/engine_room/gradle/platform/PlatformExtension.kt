@@ -13,15 +13,10 @@ import org.gradle.jvm.tasks.Jar
 import org.gradle.kotlin.dsl.*
 import org.gradle.language.jvm.tasks.ProcessResources
 import java.io.File
-import kotlin.properties.ReadWriteProperty
-import kotlin.reflect.KProperty
+import kotlin.properties.Delegates
 
 open class PlatformExtension(val project: Project) {
-    var commonProject: Project by DependentProject(this.project)
-
-    var modArtifactId: String = "flywheel-${project.name}-${project.property("artifact_minecraft_version")}"
-
-    var apiArtifactId: String = "flywheel-${project.name}-api-${project.property("artifact_minecraft_version")}"
+    var commonProject: Project by Delegates.notNull()
 
     val commonSourceSets: SourceSetContainer by lazy { commonProject.the<SourceSetContainer>() }
 
@@ -123,20 +118,5 @@ open class PlatformExtension(val project: Project) {
                 dependsOn(remapTestModJar)
             }
         }
-    }
-
-    private class DependentProject(private val thisProject: Project) : ReadWriteProperty<Any?, Project> {
-        private var value: Project? = null
-
-        override fun getValue(thisRef: Any?, property: KProperty<*>): Project {
-            return value ?: throw IllegalStateException("Property ${property.name} should be initialized before get.")
-        }
-
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: Project) {
-            this.value = value
-        }
-
-        override fun toString(): String =
-            "NotNullProperty(${if (value != null) "value=$value" else "value not initialized yet"})"
     }
 }
