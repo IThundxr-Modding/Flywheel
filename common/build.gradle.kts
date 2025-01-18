@@ -11,6 +11,7 @@ subproject.init("flywheel-common", "flywheel_group", "flywheel_version")
 val api = sourceSets.create("api")
 val lib = sourceSets.create("lib")
 val backend = sourceSets.create("backend")
+val stubs = sourceSets.create("stubs")
 val main = sourceSets.getByName("main")
 val vanillin = sourceSets.create("vanillin")
 
