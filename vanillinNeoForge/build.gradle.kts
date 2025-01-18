@@ -8,9 +8,9 @@ plugins {
 }
 
 val common = ":common"
-val platform = ":forge"
+val platform = ":neoforge"
 
-subproject.init("vanillin-forge", "vanillin_group", "vanillin_version")
+subproject.init("vanillin-neoforge", "vanillin_group", "vanillin_version")
 
 val main = sourceSets.getByName("main")
 
@@ -27,7 +27,7 @@ transitiveSourceSets {
 }
 
 jarSets {
-    mainSet.publish("vanillin-forge-${project.property("artifact_minecraft_version")}")
+    mainSet.publish("vanillin-neoforge-${project.property("artifact_minecraft_version")}")
 }
 
 defaultPackageInfos {
@@ -40,11 +40,6 @@ loom {
         add(main, "vanillin.refmap.json")
     }
 
-    forge {
-//        mixinConfig("flywheel.backend.mixins.json")
-//        mixinConfig("flywheel.impl.mixins.json")
-    }
-
     runs {
         configureEach {
             property("forge.logging.markers", "")
@@ -53,8 +48,15 @@ loom {
     }
 }
 
+repositories {
+    maven("https://maven.neoforged.net/releases/")
+}
+
 dependencies {
-    forge("net.minecraftforge:forge:${property("minecraft_version")}-${property("forge_version")}")
+    neoForge("net.neoforged:neoforge:${property("neoforge_version")}")
+
+    modCompileOnly("maven.modrinth:sodium:${property("sodium_version")}-neoforge")
+    modCompileOnly("maven.modrinth:iris:${property("iris_version")}-neoforge")
 
     modCompileOnly("maven.modrinth:embeddium:${property("embeddium_version")}")
 

@@ -45,7 +45,7 @@ jobs:
             fabric/build/libs/
             neoforge/build/libs/
             vanillinFabric/build/libs/
-            vanillinForge/build/libs/
+            vanillinNeoForge/build/libs/
 
   test:
     strategy:

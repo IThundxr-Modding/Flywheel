@@ -21,9 +21,9 @@ versionRange = "${minecraft_maven_version_range}"
 side = "CLIENT"
 
 [[dependencies.${ vanillin_id }]]
-modId = "forge"
+modId = "neoforge"
 mandatory = true
-versionRange = "${forge_version_range}"
+versionRange = "${neoforge_version_range}"
 side = "CLIENT"
 
 [[dependencies.${ vanillin_id }]]

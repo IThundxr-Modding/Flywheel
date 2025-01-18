@@ -10,7 +10,7 @@ plugins {
 val common = ":common"
 val commonProject = project(common)
 
-subproject.init("flywheel-forge", "flywheel_group", "flywheel_version")
+subproject.init("flywheel-neoforge", "flywheel_group", "flywheel_version")
 
 val api = sourceSets.create("api")
 val lib = sourceSets.create("lib")
@@ -65,12 +65,12 @@ platform {
 }
 
 jarSets {
-    mainSet.publish("flywheel-forge-${project.property("artifact_minecraft_version")}")
+    mainSet.publish("flywheel-neoforge-${project.property("artifact_minecraft_version")}")
     mainSet.outgoing("flywheel")
 
     create("api", api, lib).apply {
         addToAssemble()
-        publish("flywheel-forge-api-${project.property("artifact_minecraft_version")}")
+        publish("flywheel-neoforge-api-${project.property("artifact_minecraft_version")}")
 
         configureJar {
             manifest {
