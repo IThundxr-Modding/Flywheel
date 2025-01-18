@@ -1,4 +1,4 @@
-package dev.engine_room.flywheel.vanilla;
+package dev.engine_room.vanillin.visuals;
 
 import org.joml.Matrix4f;
 

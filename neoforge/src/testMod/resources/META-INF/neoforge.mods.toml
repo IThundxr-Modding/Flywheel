@@ -3,6 +3,6 @@ loaderVersion = "[0,)"
 license = "${mod_license}"
 
 [[mods]]
-modId = "${mod_id}_testmod"
+modId = "${flywheel_id}_testmod"
 version = "1.0.0"
-displayName = "${mod_name} Test Mod"
+displayName = "${flywheel_name} Test Mod"
