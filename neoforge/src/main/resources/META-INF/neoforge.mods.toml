@@ -27,13 +27,13 @@ side = "CLIENT"
 
 [[dependencies.${ flywheel_id }]]
 modId = "neoforge"
-mandatory = true
+type = "required"
 versionRange = "${neoforge_version_range}"
 side = "CLIENT"
 
 [[dependencies.${ flywheel_id }]]
 modId = "embeddium"
-mandatory = false
+type = "optional"
 versionRange = "[0.3.25,)"
 side = "CLIENT"
 
